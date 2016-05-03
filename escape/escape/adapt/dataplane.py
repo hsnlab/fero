@@ -271,22 +271,77 @@ class DataplaneRESTAdapter(AbstractRESTAdapter, AbstractESCAPEAdapter,
       self.__class__.__name__, self.type, self.domain_name, url))
 
   def ovsflows (self):
-    # TODO
-    pass
-
-  def start (self, cmask=None, mem=None):
-    # TODO
-    pass
+    log.debug("Send ovsflows request to remote agent: %s" % self._base_url)
+    # Get OVS ports
+    data = self.send_no_error(self.POST, 'ovsflows')
+    if data:
+      # Got data
+      log.debug("Received OVS flows from remote %s domain agent at %s" % (
+        self.domain_name, self._base_url))
+      return self._ovs_flows_parser(data)
+    else:
+      log.error("No data is received from remote agent at %s!" % self._base_url)
+      return {}
 
   def ovsports (self):
-    # TODO
-    pass
+    log.debug("Send ovsports request to remote agent: %s" % self._base_url)
+    # Get OVS ports
+    data = self.send_no_error(self.POST, 'ovsports')
+    if data:
+      # Got data
+      log.debug("Received OVS ports from remote %s domain agent at %s" % (
+        self.domain_name, self._base_url))
+      return self._ovs_port_parser(data)
+    else:
+      log.error("No data is received from remote agent at %s!" % self._base_url)
+      return {}
 
   def running (self):
+    log.debug("Send running request to remote agent: %s" % self._base_url)
+    # Get OVS ports
+    data = self.send_no_error(self.POST, 'running')
+    if data:
+      # Got data
+      log.debug("Received running Docker containers from remote %s domain "
+                "agent at %s" % (self.domain_name, self._base_url))
+      return self._running_parser(data)
+    else:
+      log.error("No data is received from remote agent at %s!" % self._base_url)
+      return {}
+
+  def start (self, cmask=None, mem=None):
+    log.debug("Prepare start request for remote agent at: %s" %
+              self._base_url)
+    try:
+      status = self.send_with_timeout(self.GET, 'start',
+                                      params={'cmask': cmask, 'mem': mem})
+      return True if status else False
+    except Timeout:
+      log.warning("Reached timeout(%ss) while waiting for start response!"
+                  " Ignore exception..." % self.CONNECTION_TIMEOUT)
+
+  def stop (self, containerID=None):
+    log.debug("Prepare stop request for remote agent at: %s" %
+              self._base_url)
+    try:
+      status = self.send_with_timeout(self.GET, 'stop/%s' % containerID)
+      return True if status else False
+    except Timeout:
+      log.warning("Reached timeout(%ss) while waiting for stop response!"
+                  " Ignore exception..." % self.CONNECTION_TIMEOUT)
+
+  @staticmethod
+  def _ovs_port_parser (data):
     # TODO
     pass
 
-  def stop (self, containerID=None):
+  @staticmethod
+  def _ovs_flows_parser (data):
+    # TODO
+    pass
+
+  @staticmethod
+  def _running_parser (data):
     # TODO
     pass
 
