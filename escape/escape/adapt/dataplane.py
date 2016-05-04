@@ -164,6 +164,7 @@ class DataplaneTopologyAdapter(AbstractESCAPEAdapter):
     # Call base constructors directly to avoid super() and MRO traps
     AbstractESCAPEAdapter.__init__(self, **kwargs)
     log.debug("Init DataplaneComputeCtrlAdapter - type: %s" % self.type)
+    self.cache = None
 
   def check_domain_reachable (self):
     """
@@ -182,6 +183,9 @@ class DataplaneTopologyAdapter(AbstractESCAPEAdapter):
     :return: the emulated topology description
     :rtype: :any:`NFFG`
     """
+    # Return cached topo if it exists
+    if self.cache:
+      return self.cache
     # Assemble shell command
     cmd_hwloc2nffg = os.path.normpath(os.path.join(
       CONFIG.get_project_root_dir(), "hwloc2nffg/build/bin/hwloc2nffg"))
