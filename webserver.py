@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from flask import Flask, request, Response
 import subprocess
 app = Flask(__name__)
