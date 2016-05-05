@@ -88,7 +88,7 @@ def __flow_processor (raw):
       if fragment.startswith(('cookie', 'duration', 'table', 'n_packets',
                               'n_bytes', 'idle_age', 'hard_age', 'actions')):
         field, value = fragment.strip(', s').split('=')
-        print field, value
+        # Convert field to int/float
         if field == "actions":
           flow[field] = value
         else:
@@ -98,7 +98,7 @@ def __flow_processor (raw):
             flow[field] = float(value)
       # Collect match field into one entry
       elif fragment:
-        if not 'match' in flow:
+        if 'match' not in flow:
           flow['match'] = [fragment]
         else:
           flow['match'].append(fragment)
