@@ -80,17 +80,28 @@ def api_stop (cid):
 
 def __flow_processor (raw):
   lines = iter(raw.strip().split('\n'))
+  # Skip first header line
   lines.next()
   for line in lines:
-    print 'Line:', line
     flow = {}
     for fragment in line.strip().split(' '):
       if fragment.startswith(('cookie', 'duration', 'table', 'n_packets',
-                              'n_bytes', 'idle_age', 'actions')):
-        field, value = fragment.strip(',').split('=')
-        flow[field] = value
+                              'n_bytes', 'idle_age', 'hard_age', 'actions')):
+        field, value = fragment.strip(', s').split('=')
+        print field, value
+        if field == "actions":
+          flow[field] = value
+        else:
+          try:
+            flow[field] = int(value, 0)
+          except ValueError:
+            flow[field] = float(value)
+      # Collect match field into one entry
       elif fragment:
-        flow['match'] = fragment
+        if not 'match' in flow:
+          flow['match'] = [fragment]
+        else:
+          flow['match'].append(fragment)
     yield flow
 
 
