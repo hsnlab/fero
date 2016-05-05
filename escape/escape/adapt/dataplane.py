@@ -16,6 +16,7 @@ Domain Manager and Adapter class for dataplane project:
 ESCAPEv2 used as a local orchestrator with resource information come from
 CPU/hardware specialities
 """
+import json
 import os
 
 from escape import CONFIG, __version__
@@ -341,8 +342,7 @@ class DataplaneRESTAdapter(AbstractRESTAdapter, AbstractESCAPEAdapter,
 
   @staticmethod
   def _ovs_flows_parser (data):
-    # TODO
-    pass
+    return json.loads(data)
 
   @staticmethod
   def _running_parser (data):
