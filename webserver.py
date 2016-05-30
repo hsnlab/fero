@@ -9,7 +9,8 @@ app = Flask(__name__)
 if len(sys.argv) > 1:
   OVS_DIR = sys.argv[1]
 else:
-  OVS_DIR = "/home/sdn-tmit/src/marci/ovs-2.5.0/utilities/"
+  #OVS_DIR = "/home/sdn-tmit/src/marci/ovs-2.5.0/utilities/"
+  OVS_DIR = "/home/cart/Documents/openvswitch-2.5.1/utilities/"
 DPDK_DIR = "/home/sdn-tmit/src/marci/dpdk-patched"
 DBR = "dpdk_br"
 SERVER = '192.168.56.103'
@@ -40,34 +41,57 @@ def api_running ():
   return res
 
 
-@app.route('/start', methods=['GET'])
+@app.route('/start', methods=['POST'])
 def api_start ():
-  cmask = request.args['cmask']
-  mem = request.args['mem']
-  subprocess.call(["sudo", OVS_DIR + "ovs-vsctl", "add-port", DBR,
-                   "vhost1", "--", "set", "Interface", "vhost1",
-                   "type=dpdkvhostuser"])
-  subprocess.call(["sudo", OVS_DIR + "ovs-ofctl", "add-flow", DBR,
-                   "in_port=1,actions=output:3"])
-  subprocess.call(["sudo", OVS_DIR + "ovs-ofctl", "add-flow", DBR,
-                   "in_port=3,actions=output:2"])
-  pid = subprocess.Popen(
-    ["sudo", "docker", "run", "-d",
-     "-v", "/usr/local/var/run/openvswitch/vhost1:/var/run/usvhost",
-     "-v", "/dev/hugepages:/dev/hugepages",
-     "dpdk-l2fwd", "./examples/l2fwd/build/l2fwd",
-     "-c", cmask, "-n", "4", "-m", mem, "--no-pci",
-     "--single-file", "--file-prefix", "fw",
-     "--vdev=eth_cvio0,mac=00:01:02:03:04:05,path=/var/run/usvhost",
-     "--", "-p", "0x1"]).pid
-  return str(pid)
 
+  data=request.json
+  mem=data["mem"]
+  core=(data['infra_id'].split('#'))[1]
+  if int(core) < 4: #The bottom two ports are reserved for OVS, thus temporary modify it.
+    core=str(4)
+  ports=data['nf_ports']
+  nf=data['nf_type'].encode() 
 
-# $sudo docker run -d -v /usr/local/var/run/openvswitch/vhost1:/var/run
-# /usvhost -v /dev/hugepages:/dev/hugepages dpdk-test
-# ./examples/l2fwd/build/l2fwd -c 0x4 -n 4 -m 1024 --no-pci --single-file
-# --file-prefix fw --vdev=eth_cvio0,mac=00:01:02:03:04:05,
-# path=/var/run/usvhost -- -p 0x1
+  params=["sudo", "docker", "run", "-d"]
+
+  ovs_ports=dict()
+  
+  x=0
+  for port in ports:
+    ovs_port=port.encode().translate(None, '#|' )				#Eliminate special characters from portname.
+    x += 1
+
+    subprocess.call(["sudo", OVS_DIR + "ovs-vsctl", "add-port", DBR,		#Add port to the bridge.
+                     ovs_port , "--", "set", "Interface",ovs_port ,
+                     "type=dpdkvhostuser"])
+
+    portnum=subprocess.check_output(["sudo", OVS_DIR + "ovs-vsctl" ,
+                                     "get", "Interface", ovs_port, "ofport"])	#Get openflow portnum of the new port.
+
+    ovs_ports[ovs_port]=portnum							#Store it.
+    params += ["-v", "/usr/local/var/run/openvswitch/" + ovs_port + ":/var/run/usvhost" + str(x)]
+    
+  params += ["-v", "/dev/hugepages:/dev/hugepages","dpdk-test",
+                 "./examples/l2fwd/build/l2fwd", "-c", "0x" + core ,
+                 "-n", "4", "-m", str(mem) , "--no-pci",
+                 "--single-file", "--file-prefix", nf]
+				 
+  x=0
+  for port in ports:
+    x += 1
+    params += ["--vdev=eth_cvio" + str(x) + ",path=/var/run/usvhost" + str(x)]
+	  
+  params += ["--", "-p", "0x" + str(pow(2,x)-1)]
+  print params	
+
+  proc=subprocess.Popen(params, stdout=subprocess.PIPE) 
+  cid=proc.stdout.readline()
+  print cid
+
+  ret = {'cid': cid, 								# ID of the new container
+         'ovs_ports': ovs_ports}						# New ports with openflow IDs
+		   
+  return json.dumps(ret), 200, {'Content-Type': 'text/application/json'}
 
 
 @app.route('/stop/<cid>')

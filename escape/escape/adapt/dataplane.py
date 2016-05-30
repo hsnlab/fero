@@ -22,6 +22,7 @@ import os
 from escape import CONFIG, __version__
 from escape.util.domain import *
 from escape.util.misc import run_cmd
+from escape.nffg_lib.nffg import *
 
 
 class DataplaneDomainManager(AbstractDomainManager):
@@ -114,16 +115,22 @@ class DataplaneDomainManager(AbstractDomainManager):
     :rtype: bool
     """
     log.info(">>> Install %s domain part..." % self.domain_name)
-    try:
-      # Mininet domain does not support NF migration directly -->
-      # Remove unnecessary and moved NFs first
-      # TODO
-      # log.debug("Generated mapped NFFG:\n%s" % nffg_part.dump())
-      return True
-    except:
-      log.exception("Got exception during NFFG installation into: %s." %
-                    self.domain_name)
-      return False
+
+    nffg_part.clear_links(NFFG.TYPE_LINK_SG)
+    nffg_part.clear_links(NFFG.TYPE_LINK_REQUIREMENT)
+    un_topo=self.topoAdapter.topo
+	
+    for infra in nffg_part.infras:
+      for nf in nffg_part.running_nfs(infra.id):
+          
+	    params = {'nf_type': nf.id, # Temporary we use id instead of nf type
+                  'nf_ports': [link.dst.id for u, v, link in
+                               nffg_part.real_out_edges_iter(nf.id)],
+                  'infra_id': infra.id}
+				
+	    self.remoteAdapter.start(**params)
+  
+    return True
 
   def clear_domain (self):
     """
@@ -235,7 +242,7 @@ class DefaultDataplaneDomainAPI(object):
     """
     raise NotImplementedError("Not implemented yet!")
 
-  def start (self, cmask=None, mem=None):
+  def start (self, nf_type=None, nf_ports=None, infra_id=None, mem=None, **kwargs):
     """
     """
     raise NotImplementedError("Not implemented yet!")
@@ -274,6 +281,7 @@ class DataplaneRESTAdapter(AbstractRESTAdapter, AbstractESCAPEAdapter,
     AbstractESCAPEAdapter.__init__(self, **kwargs)
     log.debug("Init %s - type: %s, domain: %s, URL: %s" % (
       self.__class__.__name__, self.type, self.domain_name, url))
+
 
   def ovsflows (self):
     log.debug("Send ovsflows request to remote agent: %s" % self._base_url)
@@ -314,25 +322,21 @@ class DataplaneRESTAdapter(AbstractRESTAdapter, AbstractESCAPEAdapter,
       log.error("No data is received from remote agent at %s!" % self._base_url)
       return {}
 
-  def start (self, cmask=None, mem=None):
-    log.debug("Prepare start request for remote agent at: %s" %
+  def start (self, nf_type, nf_ports, infra_id, mem=1024, **kwargs):
+    logging.debug("Prepare start request for remote agent at: %s" %
               self._base_url)
     try:
-      status = self.send_with_timeout(self.GET, 'start',
-                                      params={'cmask': cmask, 'mem': mem})
-      return True if status else False
-    except Timeout:
-      log.warning("Reached timeout(%ss) while waiting for start response!"
-                  " Ignore exception..." % self.CONNECTION_TIMEOUT)
+      data={'nf_type':nf_type, 'nf_ports': nf_ports, 'infra_id': infra_id, 'mem':mem}
+      if 'headers' not in kwargs:
+        kwargs['headers'] = dict()
+      kwargs['headers']['Content-Type'] = "application/json"
+      status = self.send_with_timeout(self.POST, 'start', 
+                                      body=json.dumps(data), **kwargs)
+      print json.loads(status)
 
-  def stop (self, containerID=None):
-    log.debug("Prepare stop request for remote agent at: %s" %
-              self._base_url)
-    try:
-      status = self.send_with_timeout(self.GET, 'stop/%s' % containerID)
       return True if status else False
     except Timeout:
-      log.warning("Reached timeout(%ss) while waiting for stop response!"
+      logging.warning("Reached timeout(%ss) while waiting for start response!"
                   " Ignore exception..." % self.CONNECTION_TIMEOUT)
 
   @staticmethod
