@@ -118,17 +118,31 @@ class DataplaneDomainManager(AbstractDomainManager):
 
     nffg_part.clear_links(NFFG.TYPE_LINK_SG)
     nffg_part.clear_links(NFFG.TYPE_LINK_REQUIREMENT)
-    un_topo=self.topoAdapter.topo
+    self.un_topo=self.topoAdapter.topo
 	
     for infra in nffg_part.infras:
+
+      if infra.id not in (n.id for n in self.un_topo.infras):
+        log.error("Infrastructure Node: %s is not found in the %s domain! "
+                  "Skip NF initiation on this Node..." %
+                  (infra.short_name, self.domain_name))
+        result = False
+        continue
+
       for nf in nffg_part.running_nfs(infra.id):
+
+        if nf.id in (nf.id for nf in self.un_topo.nfs):
+          log.debug("NF: %s has already been initiated. Continue to next NF..."
+                    % nf.short_name)
+          continue
           
-	    params = {'nf_type': nf.id, # Temporary we use id instead of nf type
-                  'nf_ports': [link.dst.id for u, v, link in
+        params = {'nf_type': nf.functional_type,
+                  'nf_id': nf.id,
+                  'nf_ports': [link.dst.id.translate(None, '#|' ) for u, v, link in
                                nffg_part.real_out_edges_iter(nf.id)],
                   'infra_id': infra.id}
-				
-	    self.remoteAdapter.start(**params)
+		
+        result=self.remoteAdapter.start(**params)
   
     return True
 
@@ -242,7 +256,7 @@ class DefaultDataplaneDomainAPI(object):
     """
     raise NotImplementedError("Not implemented yet!")
 
-  def start (self, nf_type=None, nf_ports=None, infra_id=None, mem=None, **kwargs):
+  def start (self, nf_type=None, nf_id=None, nf_ports=None, infra_id=None, mem=None, **kwargs):
     """
     """
     raise NotImplementedError("Not implemented yet!")
@@ -322,19 +336,18 @@ class DataplaneRESTAdapter(AbstractRESTAdapter, AbstractESCAPEAdapter,
       log.error("No data is received from remote agent at %s!" % self._base_url)
       return {}
 
-  def start (self, nf_type, nf_ports, infra_id, mem=1024, **kwargs):
+  def start (self, nf_type, nf_id, nf_ports, infra_id, mem=1024, **kwargs):
     logging.debug("Prepare start request for remote agent at: %s" %
               self._base_url)
     try:
-      data={'nf_type':nf_type, 'nf_ports': nf_ports, 'infra_id': infra_id, 'mem':mem}
+      data={'nf_type':nf_type, 'nf_id':nf_id, 'nf_ports': nf_ports, 'infra_id': infra_id, 'mem':mem}
       if 'headers' not in kwargs:
         kwargs['headers'] = dict()
       kwargs['headers']['Content-Type'] = "application/json"
       status = self.send_with_timeout(self.POST, 'start', 
                                       body=json.dumps(data), **kwargs)
-      print json.loads(status)
 
-      return True if status else False
+      return status if status else False
     except Timeout:
       logging.warning("Reached timeout(%ss) while waiting for start response!"
                   " Ignore exception..." % self.CONNECTION_TIMEOUT)

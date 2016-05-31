@@ -15,6 +15,11 @@ DPDK_DIR = "/home/sdn-tmit/src/marci/dpdk-patched"
 DBR = "dpdk_br"
 SERVER = '192.168.56.103'
 
+@app.errorhandler(500)
+def error_msg(error=None):
+  message={'status': 500, 'message': 'Error: ' + error}
+  return json.dumps(message), 500, {'Content-Type': 'text/application/json'}
+
 
 @app.route('/')
 def api_root ():
@@ -45,12 +50,17 @@ def api_running ():
 def api_start ():
 
   data=request.json
+  ports=data['nf_ports']
+
+  if len(ports) > 1:
+    print "Too many ports"
+    return error_msg("Too many ports")
+
   mem=data["mem"]
   core=(data['infra_id'].split('#'))[1]
-  if int(core) < 4: #The bottom two ports are reserved for OVS, thus temporary modify it.
-    core=str(4)
-  ports=data['nf_ports']
-  nf=data['nf_type'].encode() 
+  if int(core) < 4:							 #The bottom two ports are reserved for OVS, thus temporary shift it.
+    core=str(int(core)*4)
+  nf=data['nf_id'].encode() 
 
   params=["sudo", "docker", "run", "-d"]
 
@@ -58,7 +68,7 @@ def api_start ():
   
   x=0
   for port in ports:
-    ovs_port=port.encode().translate(None, '#|' )				#Eliminate special characters from portname.
+    ovs_port=port.encode()
     x += 1
 
     subprocess.call(["sudo", OVS_DIR + "ovs-vsctl", "add-port", DBR,		#Add port to the bridge.
@@ -68,7 +78,7 @@ def api_start ():
     portnum=subprocess.check_output(["sudo", OVS_DIR + "ovs-vsctl" ,
                                      "get", "Interface", ovs_port, "ofport"])	#Get openflow portnum of the new port.
 
-    ovs_ports[ovs_port]=portnum							#Store it.
+    ovs_ports[ovs_port]=portnum.rstrip()							#Store it.
     params += ["-v", "/usr/local/var/run/openvswitch/" + ovs_port + ":/var/run/usvhost" + str(x)]
     
   params += ["-v", "/dev/hugepages:/dev/hugepages","dpdk-test",
@@ -85,7 +95,7 @@ def api_start ():
   print params	
 
   proc=subprocess.Popen(params, stdout=subprocess.PIPE) 
-  cid=proc.stdout.readline()
+  cid=proc.stdout.readline().rstrip()
   print cid
 
   ret = {'cid': cid, 								# ID of the new container
