@@ -11,9 +11,6 @@
       "ports": [
         {
           "id": 1
-        }, 
-        {
-          "id": 2
         }
       ], 
       "functional_type": "ovs", 
@@ -28,8 +25,8 @@
   ], 
   "node_saps": [
     {
-      "id": "wlp2s0", 
-      "name": "wlp2s0", 
+      "id": "dpdk0", 
+      "name": "dpdk0", 
       "ports": [
         {
           "id": 1
@@ -37,8 +34,8 @@
       ]
     }, 
     {
-      "id": "enp3s0", 
-      "name": "enp3s0", 
+      "id": "dpdk1", 
+      "name": "dpdk1", 
       "ports": [
         {
           "id": 1
@@ -49,7 +46,7 @@
   "edge_sg_nexthops": [
     {
       "id": 1, 
-      "src_node": "wlp2s0", 
+      "src_node": "dpdk0", 
       "src_port": 1, 
       "dst_node": "fwd", 
       "dst_port": 1
@@ -57,17 +54,17 @@
     {
       "id": 2, 
       "src_node": "fwd", 
-      "src_port": 2, 
-      "dst_node": "enp3s0", 
+      "src_port": 1, 
+      "dst_node": "dpdk1", 
       "dst_port": 1
     }
   ], 
   "edge_reqs": [
     {
       "id": "e2e", 
-      "src_node": "wlp2s0", 
+      "src_node": "dpdk0", 
       "src_port": 1, 
-      "dst_node": "enp3s0", 
+      "dst_node": "dpdk1",
       "dst_port": 1, 
       "delay": 100, 
       "bandwidth": 50, 

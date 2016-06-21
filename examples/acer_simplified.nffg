@@ -6,8 +6,8 @@
   },
   "node_saps": [
     {
-      "id": "wlp2s0",
-      "name": "wlp2s0",
+      "id": "dpdk0",
+      "name": "dpdk0",
       "ports": [
         {
           "id": 1
@@ -15,8 +15,8 @@
       ]
     },
     {
-      "id": "enp3s0",
-      "name": "enp3s0",
+      "id": "dpdk1",
+      "name": "dpdk1",
       "ports": [
         {
           "id": 1
@@ -170,7 +170,7 @@
     },
     {
       "id": "link1",
-      "src_node": "wlp2s0",
+      "src_node": "dpdk0",
       "src_port": 1,
       "dst_node": "PCI_168c:0036!0",
       "dst_port": 1,
@@ -206,7 +206,7 @@
     },
     {
       "id": "link2",
-      "src_node": "enp3s0",
+      "src_node": "dpdk1",
       "src_port": 1,
       "dst_node": "PCI_10ec:8168!0",
       "dst_port": 1,
