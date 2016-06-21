@@ -51,6 +51,7 @@ class DataplaneDomainManager(AbstractDomainManager):
     # self.controlAdapter = None  # DomainAdapter for POX-InternalPOXAdapter
     self.topoAdapter = None  # DomainAdapter for Dataplane
     self.remoteAdapter = None  # REST management communication
+    self.deployed_vnfs = {}
 
   def init (self, configurator, **kwargs):
     """
@@ -116,7 +117,6 @@ class DataplaneDomainManager(AbstractDomainManager):
     """
     log.info(">>> Install %s domain part..." % self.domain_name)
 
-    nffg_part.clear_links(NFFG.TYPE_LINK_SG)
     nffg_part.clear_links(NFFG.TYPE_LINK_REQUIREMENT)
     self.un_topo=self.topoAdapter.topo
 	
@@ -138,12 +138,36 @@ class DataplaneDomainManager(AbstractDomainManager):
           
         params = {'nf_type': nf.functional_type,
                   'nf_id': nf.id,
-                  'nf_ports': [link.dst.id.translate(None, '#|' ) for u, v, link in
+                  'nf_ports': [link.dst.id.translate(None, '|').replace(infra.id, '') for u, v, link in
                                nffg_part.real_out_edges_iter(nf.id)],
                   'infra_id': infra.id}
 		
         result=self.remoteAdapter.start(**params)
-  
+
+        if result is not None:
+          self.deployed_vnfs[nf.id]=result
+
+    ports=self.remoteAdapter.ovsports()
+
+    print ports
+
+    for link in nffg_part.sg_hops:
+      if link.src.node.id.startswith("dpdk"):
+        src=link.src.node.id
+      else:
+        src=link.src.node.id + str(link.src.id)
+      if link.dst.node.id.startswith("dpdk"):
+        dst=link.dst.node.id
+      else:
+        dst=link.dst.node.id + str(link.dst.id)
+
+      match="in_port=" + str(ports[src])
+      actions="actions=output:" + str(ports[dst])
+
+      self.remoteAdapter.addflow(match, actions)
+		
+      print self.deployed_vnfs
+
     return True
 
   def clear_domain (self):
@@ -251,6 +275,11 @@ class DefaultDataplaneDomainAPI(object):
     """
     raise NotImplementedError("Not implemented yet!")
 
+  def addflow (self, match=None, actions=None, **kwargs):
+    """
+    """
+    raise NotImplementedError("Not implemented yet!")
+
   def running (self):
     """
     """
@@ -313,12 +342,12 @@ class DataplaneRESTAdapter(AbstractRESTAdapter, AbstractESCAPEAdapter,
   def ovsports (self):
     log.debug("Send ovsports request to remote agent: %s" % self._base_url)
     # Get OVS ports
-    data = self.send_no_error(self.POST, 'ovsports')
+    data = self.send_no_error(self.GET, 'ovsports')
     if data:
       # Got data
       log.debug("Received OVS ports from remote %s domain agent at %s" % (
         self.domain_name, self._base_url))
-      return self._ovs_port_parser(data)
+      return json.loads(data)
     else:
       log.error("No data is received from remote agent at %s!" % self._base_url)
       return {}
@@ -331,7 +360,7 @@ class DataplaneRESTAdapter(AbstractRESTAdapter, AbstractESCAPEAdapter,
       # Got data
       log.debug("Received running Docker containers from remote %s domain "
                 "agent at %s" % (self.domain_name, self._base_url))
-      return self._running_parser(data)
+      return json._running_parser(data)
     else:
       log.error("No data is received from remote agent at %s!" % self._base_url)
       return {}
@@ -347,15 +376,27 @@ class DataplaneRESTAdapter(AbstractRESTAdapter, AbstractESCAPEAdapter,
       status = self.send_with_timeout(self.POST, 'start', 
                                       body=json.dumps(data), **kwargs)
 
+      return json.loads(status) if status else None
+    except Timeout:
+      logging.warning("Reached timeout(%ss) while waiting for start response!"
+                  " Ignore exception..." % self.CONNECTION_TIMEOUT)
+
+  def addflow (self, match, actions, **kwargs):
+    logging.debug("Prepare start request for remote agent at: %s" %
+              self._base_url)
+    try:
+      data={'match':match, 'actions':actions}
+      if 'headers' not in kwargs:
+        kwargs['headers'] = dict()
+      kwargs['headers']['Content-Type'] = "application/json"
+      status = self.send_with_timeout(self.POST, 'addflow', 
+                                      body=json.dumps(data), **kwargs)
+
       return status if status else False
     except Timeout:
       logging.warning("Reached timeout(%ss) while waiting for start response!"
                   " Ignore exception..." % self.CONNECTION_TIMEOUT)
 
-  @staticmethod
-  def _ovs_port_parser (data):
-    # TODO
-    pass
 
   @staticmethod
   def _ovs_flows_parser (data):

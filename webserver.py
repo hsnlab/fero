@@ -17,7 +17,7 @@ SERVER = '192.168.56.103'
 
 @app.errorhandler(500)
 def error_msg(error=None):
-  message={'status': 500, 'message': 'Error: ' + error}
+  message={'status': 500, 'message': "Error" +  error}
   return json.dumps(message), 500, {'Content-Type': 'text/application/json'}
 
 
@@ -28,8 +28,11 @@ def api_root ():
 
 @app.route('/ovsports')
 def api_ovsports ():
-  res = subprocess.check_output(["sudo", OVS_DIR + "ovs-vsctl", "show"])
-  return res
+  res = json.loads(subprocess.check_output(["sudo", OVS_DIR + "ovs-vsctl", "-f", "json", "--", "--columns=name,ofport", "list", "Interface"]))
+  portlist={}
+  for port in res["data"]:
+    portlist[port[0]]=port[1]
+  return json.dumps(portlist), 200, {'Content-Type': 'text/application/json'}
 
 
 @app.route('/ovsflows')
@@ -44,6 +47,14 @@ def api_ovsflows ():
 def api_running ():
   res = subprocess.check_output(["sudo", "docker", "ps"])
   return res
+
+@app.route('/addflow', methods=['POST'])
+def api_addflow ():
+  data=request.json
+  match=data["match"].encode()
+  actions=data["actions"].encode()
+  subprocess.call([ "sudo", OVS_DIR + "ovs-ofctl", "add-flow", DBR, match + ',' + actions])
+  return 'OK', 200
 
 
 @app.route('/start', methods=['POST'])
@@ -92,11 +103,9 @@ def api_start ():
     params += ["--vdev=eth_cvio" + str(x) + ",path=/var/run/usvhost" + str(x)]
 	  
   params += ["--", "-p", "0x" + str(pow(2,x)-1)]
-  print params	
 
-  proc=subprocess.Popen(params, stdout=subprocess.PIPE) 
+  proc=subprocess.Popen(params, stdout=subprocess.PIPE) 	# Get container ID
   cid=proc.stdout.readline().rstrip()
-  print cid
 
   ret = {'cid': cid, 								# ID of the new container
          'ovs_ports': ovs_ports}						# New ports with openflow IDs
