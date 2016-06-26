@@ -118,11 +118,11 @@ class DataplaneDomainManager(AbstractDomainManager):
     log.info(">>> Install %s domain part..." % self.domain_name)
 
     nffg_part.clear_links(NFFG.TYPE_LINK_REQUIREMENT)
-    self.un_topo=self.topoAdapter.topo
+    un_topo=self.topoAdapter.topo
 	
     for infra in nffg_part.infras:
 
-      if infra.id not in (n.id for n in self.un_topo.infras):
+      if infra.id not in (n.id for n in un_topo.infras):
         log.error("Infrastructure Node: %s is not found in the %s domain! "
                   "Skip NF initiation on this Node..." %
                   (infra.short_name, self.domain_name))
@@ -131,7 +131,7 @@ class DataplaneDomainManager(AbstractDomainManager):
 
       for nf in nffg_part.running_nfs(infra.id):
 
-        if nf.id in (nf.id for nf in self.un_topo.nfs):
+        if nf.id in (nf.id for nf in un_topo.nfs):
           log.debug("NF: %s has already been initiated. Continue to next NF..."
                     % nf.short_name)
           continue
@@ -147,9 +147,31 @@ class DataplaneDomainManager(AbstractDomainManager):
         if result is not None:
           self.deployed_vnfs[nf.id]=result
 
-    ports=self.remoteAdapter.ovsports()
+        # Add initiated NF to topo description
+        log.info("Update Infrastructure layer topology description...")
+        deployed_nf = nf.copy()
+        deployed_nf.ports.clear()
+        un_topo.add_nf(nf=deployed_nf)
+        log.debug("Add deployed NFs to topology...")
+        # Add Link between actual NF and INFRA
+        for nf_id, infra_id, link in nffg_part.real_out_edges_iter(nf.id):
+          # Get Link's src ref to new NF's port
+          nf_port = deployed_nf.ports.append(nf.ports[link.src.id].copy())
+          # Create INFRA side Port
+          infra_port = un_topo.network.node[infra_id].add_port(
+            id=link.dst.id.translate(None, '|').replace(infra.id, ''))
+          log.debug("%s - detected physical %s" % (deployed_nf, infra_port))
+          # Add Links to un topo
+          l1, l2 = un_topo.add_undirected_link(port1=nf_port, port2=infra_port,
+                                               dynamic=True, delay=link.delay,
+                                               bandwidth=link.bandwidth)
 
-    print ports
+        log.debug("%s topology description is updated with NF: %s" % (
+          self.domain_name, deployed_nf.name))
+
+        print self.topoAdapter.topo
+
+    ports=self.remoteAdapter.ovsports()
 
     for link in nffg_part.sg_hops:
       if link.src.node.id.startswith("dpdk"):
@@ -164,9 +186,7 @@ class DataplaneDomainManager(AbstractDomainManager):
       match="in_port=" + str(ports[src])
       actions="actions=output:" + str(ports[dst])
 
-      self.remoteAdapter.addflow(match, actions)
-		
-      print self.deployed_vnfs
+      self.remoteAdapter.addflow(match, actions)	
 
     return True
 

@@ -17,7 +17,7 @@ SERVER = '192.168.56.103'
 
 @app.errorhandler(500)
 def error_msg(error=None):
-  message={'status': 500, 'message': "Error" +  error}
+  message={'status': 500, 'message': str(error)}
   return json.dumps(message), 500, {'Content-Type': 'text/application/json'}
 
 
@@ -53,44 +53,55 @@ def api_addflow ():
   data=request.json
   match=data["match"].encode()
   actions=data["actions"].encode()
-  subprocess.call([ "sudo", OVS_DIR + "ovs-ofctl", "add-flow", DBR, match + ',' + actions])
-  return 'OK', 200
-
+  ret=subprocess.check_output([ "sudo", OVS_DIR + "ovs-ofctl", "add-flow", DBR, match + ',' + actions])
+  if ret.rstrip() == "":
+    return 'OK', 200
+  else:
+    return error_msg("Error in installing flow rules")
 
 @app.route('/start', methods=['POST'])
 def api_start ():
 
   data=request.json
+
+  nftype=data['nf_type'].encode() 
+  if nftype != "ovs":
+    return error_msg("Not implemented NF type")
+
   ports=data['nf_ports']
 
+  #Currently only 1 port NFs are supported
   if len(ports) > 1:
-    print "Too many ports"
     return error_msg("Too many ports")
 
   mem=data["mem"]
   core=(data['infra_id'].split('#'))[1]
-  if int(core) < 4:							 #The bottom two ports are reserved for OVS, thus temporary shift it.
+  #The bottom two ports are reserved for OVS, thus temporary shift it
+  if int(core) < 4:
     core=str(int(core)*4)
   nf=data['nf_id'].encode() 
 
   params=["sudo", "docker", "run", "-d"]
 
-  ovs_ports=dict()
+  #Dict to store port name and ovs portnum mappings
+  ovs_ports=dict()	 
   
   x=0
   for port in ports:
     ovs_port=port.encode()
     x += 1
-
-    subprocess.call(["sudo", OVS_DIR + "ovs-vsctl", "add-port", DBR,		#Add port to the bridge.
+    #Add port to the bridge.
+    subprocess.call(["sudo", OVS_DIR + "ovs-vsctl", "add-port", DBR,		
                      ovs_port , "--", "set", "Interface",ovs_port ,
                      "type=dpdkvhostuser"])
 
+    #Get openflow portnum of the new port.
     portnum=subprocess.check_output(["sudo", OVS_DIR + "ovs-vsctl" ,
-                                     "get", "Interface", ovs_port, "ofport"])	#Get openflow portnum of the new port.
-
-    ovs_ports[ovs_port]=portnum.rstrip()							#Store it.
-    params += ["-v", "/usr/local/var/run/openvswitch/" + ovs_port + ":/var/run/usvhost" + str(x)]
+                                     "get", "Interface", ovs_port, "ofport"])
+    #Store it.
+    ovs_ports[ovs_port]=portnum.rstrip()					
+    params += ["-v", "/usr/local/var/run/openvswitch/" +
+               ovs_port + ":/var/run/usvhost" + str(x)]
     
   params += ["-v", "/dev/hugepages:/dev/hugepages","dpdk-test",
                  "./examples/l2fwd/build/l2fwd", "-c", "0x" + core ,
@@ -101,14 +112,15 @@ def api_start ():
   for port in ports:
     x += 1
     params += ["--vdev=eth_cvio" + str(x) + ",path=/var/run/usvhost" + str(x)]
-	  
-  params += ["--", "-p", "0x" + str(pow(2,x)-1)]
-
-  proc=subprocess.Popen(params, stdout=subprocess.PIPE) 	# Get container ID
+  # DPDK core mask	  
+  params += ["--", "-p", "0x" + str(pow(2,x)-1)] 
+               
+  # Get container ID
+  proc=subprocess.Popen(params, stdout=subprocess.PIPE) 	
   cid=proc.stdout.readline().rstrip()
 
-  ret = {'cid': cid, 								# ID of the new container
-         'ovs_ports': ovs_ports}						# New ports with openflow IDs
+  ret = {'cid': cid, 		  # ID of the new container
+         'ovs_ports': ovs_ports}  # New ports with openflow IDs
 		   
   return json.dumps(ret), 200, {'Content-Type': 'text/application/json'}
 
