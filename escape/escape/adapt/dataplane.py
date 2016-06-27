@@ -118,8 +118,8 @@ class DataplaneDomainManager(AbstractDomainManager):
     log.info(">>> Install %s domain part..." % self.domain_name)
 
     nffg_part.clear_links(NFFG.TYPE_LINK_REQUIREMENT)
-    un_topo=self.topoAdapter.topo
-	
+    un_topo = self.topoAdapter.topo
+
     for infra in nffg_part.infras:
 
       if infra.id not in (n.id for n in un_topo.infras):
@@ -135,17 +135,19 @@ class DataplaneDomainManager(AbstractDomainManager):
           log.debug("NF: %s has already been initiated. Continue to next NF..."
                     % nf.short_name)
           continue
-          
+
         params = {'nf_type': nf.functional_type,
                   'nf_id': nf.id,
-                  'nf_ports': [link.dst.id.translate(None, '|').replace(infra.id, '') for u, v, link in
-                               nffg_part.real_out_edges_iter(nf.id)],
+                  'nf_ports': [
+                    link.dst.id.translate(None, '|').replace(infra.id, '') for
+                    u, v, link in
+                    nffg_part.real_out_edges_iter(nf.id)],
                   'infra_id': infra.id}
-		
-        result=self.remoteAdapter.start(**params)
+
+        result = self.remoteAdapter.start(**params)
 
         if result is not None:
-          self.deployed_vnfs[nf.id]=result
+          self.deployed_vnfs[nf.id] = result
 
         # Add initiated NF to topo description
         log.info("Update Infrastructure layer topology description...")
@@ -171,22 +173,22 @@ class DataplaneDomainManager(AbstractDomainManager):
 
         print self.topoAdapter.topo
 
-    ports=self.remoteAdapter.ovsports()
+    ports = self.remoteAdapter.ovsports()
 
     for link in nffg_part.sg_hops:
       if link.src.node.id.startswith("dpdk"):
-        src=link.src.node.id
+        src = link.src.node.id
       else:
-        src=link.src.node.id + str(link.src.id)
+        src = link.src.node.id + str(link.src.id)
       if link.dst.node.id.startswith("dpdk"):
-        dst=link.dst.node.id
+        dst = link.dst.node.id
       else:
-        dst=link.dst.node.id + str(link.dst.id)
+        dst = link.dst.node.id + str(link.dst.id)
 
-      match="in_port=" + str(ports[src])
-      actions="actions=output:" + str(ports[dst])
+      match = "in_port=" + str(ports[src])
+      actions = "actions=output:" + str(ports[dst])
 
-      self.remoteAdapter.addflow(match, actions)	
+      self.remoteAdapter.addflow(match, actions)
 
     return True
 
@@ -220,7 +222,7 @@ class DataplaneTopologyAdapter(AbstractESCAPEAdapter):
   name = "DATAPLANE-COMPUTE"
   type = AbstractESCAPEAdapter.TYPE_TOPOLOGY
 
-  def __init__ (self, **kwargs):
+  def __init__ (self, merged=None, **kwargs):
     """
     Init.
 
@@ -231,6 +233,7 @@ class DataplaneTopologyAdapter(AbstractESCAPEAdapter):
     AbstractESCAPEAdapter.__init__(self, **kwargs)
     log.debug("Init DataplaneComputeCtrlAdapter - type: %s" % self.type)
     self.cache = None
+    self.merged_topo = True if merged else False
 
   def check_domain_reachable (self):
     """
@@ -256,6 +259,8 @@ class DataplaneTopologyAdapter(AbstractESCAPEAdapter):
     cmd_hwloc2nffg = os.path.normpath(os.path.join(
       CONFIG.get_project_root_dir(), "hwloc2nffg/build/bin/hwloc2nffg"))
     # Run command
+    if self.merged_topo:
+      cmd_hwloc2nffg = [cmd_hwloc2nffg, '--merged']
     raw_data = run_cmd(cmd_hwloc2nffg)
     # Basic validation
     if not raw_data.startswith('{'):
@@ -305,7 +310,8 @@ class DefaultDataplaneDomainAPI(object):
     """
     raise NotImplementedError("Not implemented yet!")
 
-  def start (self, nf_type=None, nf_id=None, nf_ports=None, infra_id=None, mem=None, **kwargs):
+  def start (self, nf_type=None, nf_id=None, nf_ports=None, infra_id=None,
+             mem=None, **kwargs):
     """
     """
     raise NotImplementedError("Not implemented yet!")
@@ -344,7 +350,6 @@ class DataplaneRESTAdapter(AbstractRESTAdapter, AbstractESCAPEAdapter,
     AbstractESCAPEAdapter.__init__(self, **kwargs)
     log.debug("Init %s - type: %s, domain: %s, URL: %s" % (
       self.__class__.__name__, self.type, self.domain_name, url))
-
 
   def ovsflows (self):
     log.debug("Send ovsflows request to remote agent: %s" % self._base_url)
@@ -387,36 +392,36 @@ class DataplaneRESTAdapter(AbstractRESTAdapter, AbstractESCAPEAdapter,
 
   def start (self, nf_type, nf_id, nf_ports, infra_id, mem=1024, **kwargs):
     logging.debug("Prepare start request for remote agent at: %s" %
-              self._base_url)
+                  self._base_url)
     try:
-      data={'nf_type':nf_type, 'nf_id':nf_id, 'nf_ports': nf_ports, 'infra_id': infra_id, 'mem':mem}
+      data = {'nf_type': nf_type, 'nf_id': nf_id, 'nf_ports': nf_ports,
+              'infra_id': infra_id, 'mem': mem}
       if 'headers' not in kwargs:
         kwargs['headers'] = dict()
       kwargs['headers']['Content-Type'] = "application/json"
-      status = self.send_with_timeout(self.POST, 'start', 
+      status = self.send_with_timeout(self.POST, 'start',
                                       body=json.dumps(data), **kwargs)
 
       return json.loads(status) if status else None
     except Timeout:
       logging.warning("Reached timeout(%ss) while waiting for start response!"
-                  " Ignore exception..." % self.CONNECTION_TIMEOUT)
+                      " Ignore exception..." % self.CONNECTION_TIMEOUT)
 
   def addflow (self, match, actions, **kwargs):
     logging.debug("Prepare start request for remote agent at: %s" %
-              self._base_url)
+                  self._base_url)
     try:
-      data={'match':match, 'actions':actions}
+      data = {'match': match, 'actions': actions}
       if 'headers' not in kwargs:
         kwargs['headers'] = dict()
       kwargs['headers']['Content-Type'] = "application/json"
-      status = self.send_with_timeout(self.POST, 'addflow', 
+      status = self.send_with_timeout(self.POST, 'addflow',
                                       body=json.dumps(data), **kwargs)
 
       return status if status else False
     except Timeout:
       logging.warning("Reached timeout(%ss) while waiting for start response!"
-                  " Ignore exception..." % self.CONNECTION_TIMEOUT)
-
+                      " Ignore exception..." % self.CONNECTION_TIMEOUT)
 
   @staticmethod
   def _ovs_flows_parser (data):
