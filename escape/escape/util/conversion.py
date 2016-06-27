@@ -410,9 +410,18 @@ class NFFGConverter(object):
         nf_dep_type = None
       # Add NF resources, remove optional units
       if v_vnf.resources.is_initialized():
-        nf_cpu = v_vnf.resources.cpu.get_as_text().split(' ')[0]
-        nf_mem = v_vnf.resources.mem.get_as_text().split(' ')[0]
-        nf_storage = v_vnf.resources.storage.get_as_text().split(' ')[0]
+        if v_vnf.resources.cpu.is_initialized():
+          nf_cpu = v_vnf.resources.cpu.get_as_text().split(' ')[0]
+        else:
+          nf_cpu = None
+        if v_vnf.resources.mem.is_initialized():
+          nf_mem = v_vnf.resources.mem.get_as_text().split(' ')[0]
+        else:
+          nf_mem = None
+        if v_vnf.resources.storage.is_initialized():
+          nf_storage = v_vnf.resources.storage.get_as_text().split(' ')[0]
+        else:
+          nf_storage = None
         try:
           nf_cpu = float(nf_cpu) if nf_cpu is not None else None
         except ValueError as e:
@@ -834,12 +843,12 @@ class NFFGConverter(object):
         dst_node_id = dst_node.id.get_value()
       try:
         src_port_id = int(src_port.id.get_value())
-      except ValueError as e:
+      except ValueError:
         # self.log.warning("Source port id is not a valid number: %s" % e)
         src_port_id = src_port.id.get_value()
       try:
         dst_port_id = int(dst_port.id.get_value())
-      except ValueError as e:
+      except ValueError:
         # self.log.warning("Destination port id is not a valid number: %s" % e)
         dst_port_id = dst_port.id.get_value()
       params = dict()
@@ -1057,14 +1066,11 @@ class NFFGConverter(object):
         # There are valid port-pairs
         for i, port_pair in enumerate(combinations(
            (p.id.get_value() for p in v_node.ports), 2)):
-          if infra.resources.delay is not None:
+          v_link_delay = v_link_bw = None
+          if infra.resources.delay:
             v_link_delay = str(infra.resources.delay)
-          else:
-            v_link_delay = None
-          if infra.resources.bandwidth is not None:
+          if infra.resources.bandwidth:
             v_link_bw = str(infra.resources.bandwidth)
-          else:
-            v_link_bw = None
           # Create link
           v_link = virt_lib.Link(id="resource-link%s" % i,
                                  src=v_node.ports[port_pair[0]],
@@ -1078,20 +1084,17 @@ class NFFGConverter(object):
       elif port_num == 1:
         # Only one port in infra - create loop-edge
         v_link_src = v_link_dst = iter(v_node.ports).next()
+        v_link_delay = v_link_bw = None
         if infra.resources.delay:
-          v_link_delay = infra.resources.delay
-        else:
-          v_link_delay = None
+          v_link_delay = str(infra.resources.delay)
         if infra.resources.bandwidth:
-          v_link_bw = infra.resources.bandwidth
-        else:
-          v_link_bw = None
+          v_link_bw = str(infra.resources.bandwidth)
         v_link = virt_lib.Link(id="resource-link",
                                src=v_link_src,
                                dst=v_link_dst,
                                resources=virt_lib.Link_resource(
-                                 delay=str(v_link_delay),
-                                 bandwidth=str(v_link_bw)))
+                                 delay=v_link_delay,
+                                 bandwidth=v_link_bw))
         # Call bind to resolve src,dst references to workaround a bug
         # v_link.bind()
         v_node.links.add(v_link)

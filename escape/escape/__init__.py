@@ -102,7 +102,8 @@ cfg = {
       # Interface / Upper layer related configuration
       "ESCAPE-SERVICE":
         {
-          "virtualizer_type": "SINGLE"
+          # "virtualizer_type": "SINGLE"
+          "virtualizer_type": "GLOBAL"
         },
       "Sl-Or":
         {
@@ -136,6 +137,7 @@ cfg = {
         # "SDN",
         # "OPENSTACK",
         # "UN"
+        # "DOCKER"
       ],
       "RESET-DOMAINS-BEFORE-INSTALL": False,
       "CLEAR-DOMAINS-AFTER-SHUTDOWN": False,  # Shutdown strategy config
@@ -272,8 +274,17 @@ cfg = {
       "DOCKER":
         {
           "module": "escape.adapt.managers",
-          "class": "DockerDomainManager",
-          "poll": False
+          "class": "UnifyDomainManager",
+          "poll": False,
+          "diff": True,
+          "adapters": {
+            "REMOTE":
+              {
+                "module": "escape.adapt.adapters",
+                "class": "UnifyRESTAdapter",
+                "url": "http://192.168.0.121:8888"
+              }
+          }
         }
     },
   "infrastructure":  # Infrastructure Layer
@@ -320,7 +331,8 @@ def add_dependencies ():
 
   # Skipped folders under project's root
   skipped = ("escape", "examples", "pox", "OpenYuma", "Unify_ncagent", "tools",
-             "gui", "hwloc2nffg", "nffg_BME", "include", "share", "lib", "bin")
+             "gui", "hwloc2nffg", "nffg_BME", "include", "share", "lib", "bin",
+             "dummy-orchestrator")
   for sub_folder in os.listdir(PROJECT_ROOT):
     abs_sub_folder = os.path.join(PROJECT_ROOT, sub_folder)
     if not os.path.isdir(abs_sub_folder):
