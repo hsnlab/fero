@@ -260,7 +260,8 @@ class DataplaneTopologyAdapter(AbstractESCAPEAdapter):
       CONFIG.get_project_root_dir(), "hwloc2nffg/build/bin/hwloc2nffg"))
     # Run command
     if self.merged_topo:
-      cmd_hwloc2nffg = [cmd_hwloc2nffg, '--merged']
+      # cmd_hwloc2nffg = [cmd_hwloc2nffg, '--merge']
+      cmd_hwloc2nffg += ' --merge'
     raw_data = run_cmd(cmd_hwloc2nffg)
     # Basic validation
     if not raw_data.startswith('{'):
