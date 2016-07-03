@@ -219,10 +219,14 @@ class DataplaneTopologyAdapter(AbstractESCAPEAdapter):
   """
   # Events raised by this class
   _eventMixin_events = {DomainChangedEvent}
+  # DomainAdapter constants
   name = "DATAPLANE-COMPUTE"
   type = AbstractESCAPEAdapter.TYPE_TOPOLOGY
+  # hwlock2nffg config
+  HWLOC2NFFG_BIN = "hwloc2nffg/build/bin/hwloc2nffg"
+  HWLOC_PARAMS = ['--merge', '--dpdk']
 
-  def __init__ (self, merged=None, **kwargs):
+  def __init__ (self, params=None, **kwargs):
     """
     Init.
 
@@ -233,7 +237,9 @@ class DataplaneTopologyAdapter(AbstractESCAPEAdapter):
     AbstractESCAPEAdapter.__init__(self, **kwargs)
     log.debug("Init DataplaneComputeCtrlAdapter - type: %s" % self.type)
     self.cache = None
-    self.merged_topo = True if merged else False
+    # If initial parameters are explicitly given
+    if params is not None:
+      self.HWLOC_PARAMS = list(params)
 
   def check_domain_reachable (self):
     """
@@ -256,12 +262,12 @@ class DataplaneTopologyAdapter(AbstractESCAPEAdapter):
     if self.cache:
       return self.cache
     # Assemble shell command
-    cmd_hwloc2nffg = os.path.normpath(os.path.join(
-      CONFIG.get_project_root_dir(), "hwloc2nffg/build/bin/hwloc2nffg"))
+    cmd_hwloc2nffg = [os.path.normpath(os.path.join(
+      CONFIG.get_project_root_dir(), self.HWLOC2NFFG_BIN))]
+    # Add hwlock params
+    cmd_hwloc2nffg.extend(self.HWLOC_PARAMS)
+    log.debug("Used command: %s" % cmd_hwloc2nffg)
     # Run command
-    if self.merged_topo:
-      # cmd_hwloc2nffg = [cmd_hwloc2nffg, '--merge']
-      cmd_hwloc2nffg += ' --merge'
     raw_data = run_cmd(cmd_hwloc2nffg)
     # Basic validation
     if not raw_data.startswith('{'):
