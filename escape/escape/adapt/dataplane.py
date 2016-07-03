@@ -97,6 +97,7 @@ class DataplaneDomainManager(AbstractDomainManager):
 
     :return: None
     """
+    self.clear_domain ()
     super(DataplaneDomainManager, self).finit()
     # self.controlAdapter.finit()
     self.topoAdapter.finit()
@@ -171,8 +172,6 @@ class DataplaneDomainManager(AbstractDomainManager):
         log.debug("%s topology description is updated with NF: %s" % (
           self.domain_name, deployed_nf.name))
 
-        print self.topoAdapter.topo
-
     ports = self.remoteAdapter.ovsports()
 
     for link in nffg_part.sg_hops:
@@ -200,7 +199,7 @@ class DataplaneDomainManager(AbstractDomainManager):
 
     :return: cleanup result
     :rtype: bool
-    """
+   
     if not self.topoAdapter.check_domain_reachable():
       # This would be the normal behaviour if ESCAPEv2 is shutting down -->
       # Infrastructure layer has been cleared.
@@ -208,6 +207,29 @@ class DataplaneDomainManager(AbstractDomainManager):
       return True
     # something went wrong ??
     return False
+     """
+
+    #topo = self.topoAdapter.get_topology_resource()
+    topo = self.topoAdapter.topo
+    if topo is None:
+      log.warning("Missing topology description from %s domain! "
+                  "Skip deleting NFs..." % self.domain_name)
+      return False
+
+    for infra in topo.infras:
+      running_nfs = [n.id for n in topo.running_nfs(infra.id)]
+      for nf_id in running_nfs:
+          for u, v, link in topo.network.out_edges([nf_id], data=True):
+            port=link.dst.id
+            self.remoteAdapter.delport(port)
+            topo[v].del_port(id=port)
+          # Delete NF
+          self.remoteAdapter.stop(self.deployed_vnfs[nf_id]['cid'])
+          topo.del_node(nf_id)
+
+    # Infrastructure layer has been cleared.
+    log.debug("%s domain has been cleared!" % self.domain_name)
+    return True
 
 
 class DataplaneTopologyAdapter(AbstractESCAPEAdapter):
@@ -312,7 +334,12 @@ class DefaultDataplaneDomainAPI(object):
     """
     raise NotImplementedError("Not implemented yet!")
 
-  def running (self):
+  def delflow (self, match=None):
+    """
+    """
+    raise NotImplementedError("Not implemented yet!")
+
+  def delport (self, portname=None):
     """
     """
     raise NotImplementedError("Not implemented yet!")
@@ -384,18 +411,6 @@ class DataplaneRESTAdapter(AbstractRESTAdapter, AbstractESCAPEAdapter,
       log.error("No data is received from remote agent at %s!" % self._base_url)
       return {}
 
-  def running (self):
-    log.debug("Send running request to remote agent: %s" % self._base_url)
-    # Get OVS ports
-    data = self.send_no_error(self.POST, 'running')
-    if data:
-      # Got data
-      log.debug("Received running Docker containers from remote %s domain "
-                "agent at %s" % (self.domain_name, self._base_url))
-      return json._running_parser(data)
-    else:
-      log.error("No data is received from remote agent at %s!" % self._base_url)
-      return {}
 
   def start (self, nf_type, nf_id, nf_ports, infra_id, mem=1024, **kwargs):
     logging.debug("Prepare start request for remote agent at: %s" %
@@ -429,6 +444,39 @@ class DataplaneRESTAdapter(AbstractRESTAdapter, AbstractESCAPEAdapter,
     except Timeout:
       logging.warning("Reached timeout(%ss) while waiting for start response!"
                       " Ignore exception..." % self.CONNECTION_TIMEOUT)
+
+  def stop (self, containerID):
+    log.debug("Send running request to remote agent: %s" % self._base_url)
+    response = self.send_no_error(self.GET, 'stop/' + containerID)
+    if response:
+      log.debug("Stopped Docker container from remote %s domain "
+                "agent at %s" % (self.domain_name, self._base_url))
+      return True
+    else:
+      log.error("No data is received from remote agent at %s!" % self._base_url)
+      return False
+
+  def delport (self, portname):
+    log.debug("Send delport request to remote agent: %s" % self._base_url)
+    response = self.send_no_error(self.GET, 'delport/' + portname)
+    if response:
+      log.debug("Port deleted from remote %s domain "
+                "agent at %s" % (self.domain_name, self._base_url))
+      return True
+    else:
+      log.error("No data is received from remote agent at %s!" % self._base_url)
+      return False
+
+  def delflow (self, match):
+    log.debug("Send running request to remote agent: %s" % self._base_url)
+    response = self.send_no_error(self.GET, 'delflow/' + match)
+    if response:
+      log.debug("Flow deleted from remote %s domain "
+                "agent at %s" % (self.domain_name, self._base_url))
+      return True
+    else:
+      log.error("No data is received from remote agent at %s!" % self._base_url)
+      return False
 
   @staticmethod
   def _ovs_flows_parser (data):

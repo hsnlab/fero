@@ -42,12 +42,6 @@ def api_ovsflows ():
   flows = list(__flow_processor(res))
   return json.dumps(flows), 200, {'Content-Type': 'text/application/json'}
 
-
-@app.route('/running')
-def api_running ():
-  res = subprocess.check_output(["sudo", "docker", "ps"])
-  return res
-
 @app.route('/addflow', methods=['POST'])
 def api_addflow ():
   data=request.json
@@ -128,9 +122,20 @@ def api_start ():
 @app.route('/stop/<cid>')
 def api_stop (cid):
   ret = subprocess.check_output(["sudo", "docker", "stop", cid])
-  subprocess.call(["sudo", OVS_DIR + "ovs-vsctl", "del-port", DBR, "vhost1"])
-  subprocess.call(["sudo", OVS_DIR + "ovs-ofctl", "del-flows", DBR])
   return ret
+
+@app.route('/delflow/<match>')
+def api_delflow (match):
+  res = subprocess.check_output(["sudo", OVS_DIR + "ovs-ofctl", "--strict", "del-flows", DBR, match ])
+  return "OK", 200
+
+@app.route('/delport/<portname>')
+def api_delport (portname):
+  ret = subprocess.check_output(["sudo", OVS_DIR + "ovs-vsctl", "del-port", DBR, portname ])
+  if ret.rstrip() == "":
+    return 'OK', 200
+  else:
+    return error_msg("Error in deleting ports")
 
 
 def __flow_processor (raw):
