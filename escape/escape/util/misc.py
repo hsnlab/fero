@@ -140,7 +140,7 @@ def run_cmd (cmd):
   if isinstance(cmd, basestring):
     shell_cmd.append(cmd)
   elif isinstance(cmd, (list, tuple)):
-    shell_cmd.extend(cmd)
+    shell_cmd.append(' '.join(cmd))
   return Popen(shell_cmd, stdout=PIPE, stderr=STDOUT).communicate()[0]
 
 
