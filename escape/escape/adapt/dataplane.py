@@ -142,8 +142,7 @@ class DataplaneDomainManager(AbstractDomainManager):
                   'nf_ports': [
                     link.dst.id.translate(None, '|').replace(infra.id, '') for
                     u, v, link in
-                    nffg_part.real_out_edges_iter(nf.id)],
-                  'infra_id': infra.id}
+                    nffg_part.real_out_edges_iter(nf.id)], 'infra_id': infra.id}
 
         result = self.remoteAdapter.start(**params)
 
@@ -173,6 +172,8 @@ class DataplaneDomainManager(AbstractDomainManager):
           self.domain_name, deployed_nf.name))
 
     ports = self.remoteAdapter.ovsports()
+
+    # Add flow rules based on sg hops in the actual request
 
     for link in nffg_part.sg_hops:
       if link.src.node.id.startswith("dpdk"):
@@ -219,6 +220,7 @@ class DataplaneDomainManager(AbstractDomainManager):
     for infra in topo.infras:
       running_nfs = [n.id for n in topo.running_nfs(infra.id)]
       for nf_id in running_nfs:
+          # Delete ports
           for u, v, link in topo.network.out_edges([nf_id], data=True):
             port=link.dst.id
             self.remoteAdapter.delport(port)
@@ -227,6 +229,8 @@ class DataplaneDomainManager(AbstractDomainManager):
           self.remoteAdapter.stop(self.deployed_vnfs[nf_id]['cid'])
           topo.del_node(nf_id)
 
+    # Delete all flow rules
+    self.remoteAdapter.delflow()
     # Infrastructure layer has been cleared.
     log.debug("%s domain has been cleared!" % self.domain_name)
     return True
@@ -334,7 +338,7 @@ class DefaultDataplaneDomainAPI(object):
     """
     raise NotImplementedError("Not implemented yet!")
 
-  def delflow (self, match=None):
+  def delflow (self):
     """
     """
     raise NotImplementedError("Not implemented yet!")
@@ -467,9 +471,9 @@ class DataplaneRESTAdapter(AbstractRESTAdapter, AbstractESCAPEAdapter,
       log.error("No data is received from remote agent at %s!" % self._base_url)
       return False
 
-  def delflow (self, match):
+  def delflow (self):
     log.debug("Send running request to remote agent: %s" % self._base_url)
-    response = self.send_no_error(self.GET, 'delflow/' + match)
+    response = self.send_no_error(self.GET, 'delflow')
     if response:
       log.debug("Flow deleted from remote %s domain "
                 "agent at %s" % (self.domain_name, self._base_url))

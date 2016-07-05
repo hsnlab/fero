@@ -124,9 +124,9 @@ def api_stop (cid):
   ret = subprocess.check_output(["sudo", "docker", "stop", cid])
   return ret
 
-@app.route('/delflow/<match>')
-def api_delflow (match):
-  res = subprocess.check_output(["sudo", OVS_DIR + "ovs-ofctl", "--strict", "del-flows", DBR, match ])
+@app.route('/delflow')
+def api_delflow ():
+  res = subprocess.check_output(["sudo", OVS_DIR + "ovs-ofctl", "del-flows", DBR])
   return "OK", 200
 
 @app.route('/delport/<portname>')
