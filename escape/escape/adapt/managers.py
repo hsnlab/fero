@@ -151,7 +151,7 @@ class InternalDomainManager(AbstractDomainManager):
                 "Skip SAP data discovery.")
     for sap in topo.saps:
       # skip inter-domain SAPs
-      if sap.domain is not None:
+      if sap.binding is not None:
         continue
       connected_node = [(v, link.dst.id) for u, v, link in
                         topo.real_out_edges_iter(sap.id)]
@@ -659,7 +659,7 @@ class InternalDomainManager(AbstractDomainManager):
     log.debug("Flowrule deploy result: %s" %
               ("SUCCESS" if result else "FAILURE"))
     log.log(VERBOSE,
-            "Registered VLAN IDs:\n%s" % pprint.pformat(self.vlan_register))
+            "Registered VLAN IDs: %s" % pprint.pformat(self.vlan_register))
     return result
 
   def __process_tag (self, abstract_id):

@@ -619,14 +619,21 @@ class CoreAlgorithm(object):
     self.manager.updateChainLatencyInfo(c['id'], 
                                         -1*link_bt_record['used_lat'], 
                                         link_bt_record['path'][0])
-    self.manager.link_mapping.remove_edge(link_bt_record['vnf1'], 
-                                          link_bt_record['vnf2'], 
-                                          key = link_bt_record['reqlinkid'])
+    try:
+      self.manager.link_mapping.remove_edge(link_bt_record['vnf1'], 
+                                            link_bt_record['vnf2'], 
+                                            key = link_bt_record['reqlinkid'])
+    except nx.NetworkXError as nxe:
+      raise uet.InternalAlgorithmException("Tried to remove edge from link "
+            "mapping structure which is not mapped during LinkMappingRecord "
+                                           "resolution!")
 
   def _resolveBacktrackRecord(self, c, bt_record):
     """
     Undo VNF resource reservetion on host and path leading to it.
     """
+    self.log.debug("Redoing link and node resource due to Backtrack record "
+                   "handling.")
     self._updateGraphResources(bt_record['bw_req'],
                                bt_record['path'], 
                                bt_record['path_link_ids'],
@@ -639,7 +646,8 @@ class CoreAlgorithm(object):
                                             key=bt_record['reqlinkid'])
     except nx.NetworkXError as nxe:
       raise uet.InternalAlgorithmException("Tried to remove edge from link "
-                "mapping structure which is not mapped!")
+            "mapping structure which is not mapped during Backtrack Record "
+                                           "resolution!")
     if self.req.node[bt_record['vnf_id']].type != 'SAP':
       self.manager.vnf_mapping.remove((bt_record['vnf_id'], 
                                        bt_record['target_infra']))
@@ -1036,12 +1044,22 @@ class CoreAlgorithm(object):
     # breaking when there are no more BacktrackLevels forward, meaning the 
     # mapping is full. Or exception is thrown, when mapping can't be finished.
     self.log.info("Starting core mapping procedure...")
+    c = None
+    curr_vnf = None
+    next_vnf = None
+    linkid = None
     while True:
       # Mapping must be started with subchains derived from e2e chains,
-      # with lower latency requirement. It is realiyed by the preprocessor,
+      # with lower latency requirement. It is realized by the preprocessor,
       # because it adds the subchains in the appropriate order.
-      # ANF moveOneSubchainLevelForward() respects this order.
-      tmp = self.bt_handler.moveOneBacktrackLevelForward()
+      # AND moveOneSubchainLevelForward() respects this order.
+      ready_for_next_subchain = False
+      if c is not None:
+        ready_for_next_subchain = (curr_vnf == c['chain'][-2] and \
+                                   next_vnf == c['chain'][-1]) and \
+                                  (curr_vnf, next_vnf, linkid) in \
+                                  self.manager.link_mapping.edges(keys=True)
+      tmp = self.bt_handler.moveOneBacktrackLevelForward(ready_for_next_subchain)
       if tmp is None:
         break
       else:
