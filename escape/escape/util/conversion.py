@@ -279,17 +279,17 @@ class NFFGConverter(object):
           # Use port name as the SAP.id if it is set else generate one
           # SAP.id <--> virtualizer.node.port.id
           sap_id = vport.id.get_value()
-          log.debug("Detected SAP id as id field: %s" % sap_id)
+          self.log.debug("Detected SAP id as id field: %s" % sap_id)
         # SAP.id <--> virtualizer.node.port.name
+        elif vport.name.is_initialized() and \
+           vport.name.get_as_text().upper().startswith(
+                self.SAP_NAME_PREFIX + ":"):
+          sap_id = vport.name.get_as_text()[len(self.SAP_NAME_PREFIX + ":"):]
+          self.log.debug("Detected SAP id from name field: %s" % sap_id)
         elif vport.name.is_initialized() and \
            vport.name.get_as_text().upper().startswith(self.SAP_NAME_PREFIX):
           sap_id = vport.name.get_as_text()
           self.log.debug("Detected SAP id as name field: %s" % sap_id)
-        elif vport.name.is_initialized() and \
-           vport.name.get_as_text().upper().startswith(
-                self.SAP_NAME_PREFIX + ":"):
-          sap_id = vport.name.get_as_text()[len(self.SAP_NAME_PREFIX) + 1:]
-          self.log.debug("Detected SAP id from name field: %s" % sap_id)
         else:
           # Backup SAP id generation
           # sap_id = "SAP%s" % len([s for s in nffg.saps])
@@ -297,8 +297,18 @@ class NFFGConverter(object):
           self.log.warning(
             "No explicit SAP id was detected! Generated: %s" % sap_id)
 
+        # Add port names
+        if vport.name.is_initialized():
+          sap_prefix = "%s:" % self.SAP_NAME_PREFIX
+          if vport.name.get_as_text().startswith(sap_prefix):
+            sap_name = vport.name.get_as_text()[len(sap_prefix):]
+          else:
+            sap_name = vport.name.get_as_text()
+        else:
+          sap_name = sap_id
+
         # Create SAP and Add port to SAP
-        sap = nffg.add_sap(id=sap_id)
+        sap = nffg.add_sap(id=sap_id, name=sap_name)
         self.log.debug("Created SAP node: %s" % sap)
 
         try:
@@ -333,15 +343,7 @@ class NFFGConverter(object):
 
         # Add port names
         if vport.name.is_initialized():
-          if not vport.name.get_as_text().startswith(self.SAP_NAME_PREFIX):
-            sap_port.name = vport.name.get_value()
-            # For backward compatibility
-            # sap_port.add_property("name", vport.name.get_value())
-            # SAP.name will be the same as the SAP.id or generate one for backup
-            sap.name = vport.name.get_value()  # Optional - port.name
-            # Add port properties as property to Infra port too
-            # infra_port.add_property("name", vport.name.get_value())
-            # Copy the original name to infra port even if it starts with 'SAP:'
+          sap_port.name = vport.name.get_as_text()
           infra_port.name = vport.name.get_value()
 
         # Fill SAP-specific data
@@ -1341,7 +1343,6 @@ class NFFGConverter(object):
                                   v_sap_port.sap.get_value()))
         else:
           # If sap is not inter-domain SAP, use name field to store sap id and
-          # set port-type to port-abstract
           v_sap_port.name.set_value("%s:%s" % (self.SAP_NAME_PREFIX, sap.id))
 
         # Set sap.name if it has not used for storing SAP.id
@@ -1853,17 +1854,17 @@ if __name__ == "__main__":
   # log.debug(nffg.dump())
 
   dov = virt_lib.Virtualizer.parse_from_file(
-    "test2.xml")
+    # "test2.xml")
+    "un1.xml")
   # dov.bind(relative=True)
   log.info("Parsed XML:")
   log.info("%s" % dov.xml())
   nffg = c.parse_from_Virtualizer(vdata=dov.xml())
   log.info("Converted NFFG:")
   log.info("%s" % nffg.dump())
-  virt = c.dump_to_Virtualizer(nffg=nffg)
-  # # virt.bind()
-  log.info("Reconverted Virtualizer:")
-  log.info("%s" % virt.xml())
+  # virt = c.dump_to_Virtualizer(nffg=nffg)
+  # log.info("Reconverted Virtualizer:")
+  # log.info("%s" % virt.xml())
 
   # dov = virt_lib.Virtualizer.parse_from_file(
   #   "../../../../examples/escape-2sbb-topo.xml")
