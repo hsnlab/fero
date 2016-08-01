@@ -1,0 +1,102 @@
+{
+  "parameters": {
+    "id": "test-req", 
+    "name": "NFFG-test-request", 
+    "version": "1.0"
+  }, 
+  "node_nfs": [
+    {
+      "id": "fwd", 
+      "name": "simpleForwarder", 
+      "ports": [
+        {
+          "id": 1
+        }
+      ], 
+      "functional_type": "simpleForwarder", 
+      "specification": {
+        "resources": {
+          "cpu": 1, 
+          "mem": 1, 
+          "storage": 0
+        }
+      }
+    },
+    {
+      "id": "pkg", 
+      "name": "trafficGenerator", 
+      "ports": [
+        {
+          "id": 1
+        }
+      ], 
+      "functional_type": "trafficGenerator", 
+      "specification": {
+        "resources": {
+          "cpu": 1, 
+          "mem": 1, 
+          "storage": 0
+        }
+      }
+    }
+  ], 
+  "node_saps": [
+    {
+      "id": "dpdk1-tethys", 
+      "name": "dpdk1-tethys", 
+      "ports": [
+        {
+          "id": 1
+        }
+      ]
+    }, 
+    {
+      "id": "dpdk1-dione", 
+      "name": "dpdk1-dione", 
+      "ports": [
+        {
+          "id": 1
+        }
+      ]
+    }
+  ], 
+  "edge_sg_nexthops": [
+    {
+      "id": 1, 
+      "src_node": "dpdk1-dione", 
+      "src_port": 1, 
+      "dst_node": "pkg", 
+      "dst_port": 1
+    }, 
+    {
+      "id": 2, 
+      "src_node": "pkg", 
+      "src_port": 1, 
+      "dst_node": "fwd", 
+      "dst_port": 1
+    },
+    {
+      "id": 3, 
+      "src_node": "fwd", 
+      "src_port": 1, 
+      "dst_node": "dpdk1-tethys", 
+      "dst_port": 1
+    }
+  ], 
+  "edge_reqs": [
+    {
+      "id": "e2e", 
+      "src_node": "dpdk1-dione", 
+      "src_port": 1, 
+      "dst_node": "dpdk1-tethys",
+      "dst_port": 1, 
+      "delay": 100, 
+      "bandwidth": 50, 
+      "sg_path": [
+        1, 
+        2,
+        3
+      ]
+    }
+  ]
+}

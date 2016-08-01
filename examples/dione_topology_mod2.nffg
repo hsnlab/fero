@@ -1,0 +1,910 @@
+{
+   "edge_links" : [
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "PU#0",
+         "dst_port" : 0,
+         "id" : 2,
+         "src_node" : "Core#0",
+         "src_port" : 3
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "PU#6",
+         "dst_port" : 1,
+         "id" : 4,
+         "src_node" : "Core#0",
+         "src_port" : 5
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "PU#1",
+         "dst_port" : 7,
+         "id" : 9,
+         "src_node" : "Core#1",
+         "src_port" : 10
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "PU#7",
+         "dst_port" : 8,
+         "id" : 11,
+         "src_node" : "Core#1",
+         "src_port" : 12
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "PU#2",
+         "dst_port" : 14,
+         "id" : 16,
+         "src_node" : "Core#2",
+         "src_port" : 17
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "PU#8",
+         "dst_port" : 15,
+         "id" : 18,
+         "src_node" : "Core#2",
+         "src_port" : 19
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "PU#3",
+         "dst_port" : 21,
+         "id" : 23,
+         "src_node" : "Core#3",
+         "src_port" : 24
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "PU#9",
+         "dst_port" : 22,
+         "id" : 25,
+         "src_node" : "Core#3",
+         "src_port" : 26
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "PU#4",
+         "dst_port" : 28,
+         "id" : 30,
+         "src_node" : "Core#4",
+         "src_port" : 31
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "PU#10",
+         "dst_port" : 29,
+         "id" : 32,
+         "src_node" : "Core#4",
+         "src_port" : 33
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "PU#5",
+         "dst_port" : 35,
+         "id" : 37,
+         "src_node" : "Core#5",
+         "src_port" : 38
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "PU#11",
+         "dst_port" : 36,
+         "id" : 39,
+         "src_node" : "Core#5",
+         "src_port" : 40
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "Core#0",
+         "dst_port" : 6,
+         "id" : 42,
+         "src_node" : "L3!0",
+         "src_port" : 43
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "Core#1",
+         "dst_port" : 13,
+         "id" : 44,
+         "src_node" : "L3!0",
+         "src_port" : 45
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "Core#2",
+         "dst_port" : 20,
+         "id" : 46,
+         "src_node" : "L3!0",
+         "src_port" : 47
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "Core#3",
+         "dst_port" : 27,
+         "id" : 48,
+         "src_node" : "L3!0",
+         "src_port" : 49
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "Core#4",
+         "dst_port" : 34,
+         "id" : 50,
+         "src_node" : "L3!0",
+         "src_port" : 51
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "Core#5",
+         "dst_port" : 41,
+         "id" : 52,
+         "src_node" : "L3!0",
+         "src_port" : 53
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "dpdk0",
+         "dst_port" : 56,
+         "id" : 57,
+         "src_node" : "0000:11:00.0",
+         "src_port" : 58
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "dpdk1-dione",
+         "dst_port" : 60,
+         "id" : 61,
+         "src_node" : "0000:11:00.1",
+         "src_port" : 62
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "0000:11:00.0",
+         "dst_port" : 59,
+         "id" : 64,
+         "src_node" : "PCIBridge!0",
+         "src_port" : 65
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "0000:11:00.1",
+         "dst_port" : 63,
+         "id" : 66,
+         "src_node" : "PCIBridge!0",
+         "src_port" : 67
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "eth0-dione",
+         "dst_port" : 69,
+         "id" : 73,
+         "src_node" : "PCIBridge!1",
+         "src_port" : 74
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "eth1-dione",
+         "dst_port" : 70,
+         "id" : 75,
+         "src_node" : "PCIBridge!1",
+         "src_port" : 76
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "eth2-dione",
+         "dst_port" : 71,
+         "id" : 77,
+         "src_node" : "PCIBridge!1",
+         "src_port" : 78
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "eth3-dione",
+         "dst_port" : 72,
+         "id" : 79,
+         "src_node" : "PCIBridge!1",
+         "src_port" : 80
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "eth40-dione",
+         "dst_port" : 55,
+         "id" : 82,
+         "src_node" : "HostBridge!0",
+         "src_port" : 83
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "PCIBridge!0",
+         "dst_port" : 68,
+         "id" : 84,
+         "src_node" : "HostBridge!0",
+         "src_port" : 85
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "PCIBridge!1",
+         "dst_port" : 81,
+         "id" : 86,
+         "src_node" : "HostBridge!0",
+         "src_port" : 87
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "L3!0",
+         "dst_port" : 54,
+         "id" : 89,
+         "src_node" : "Machine#0",
+         "src_port" : 90
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "HostBridge!0",
+         "dst_port" : 88,
+         "id" : 91,
+         "src_node" : "Machine#0",
+         "src_port" : 92
+      }
+   ],
+   "node_infras" : [
+      {
+         "domain" : "INTERNAL",
+         "id" : "PU#0",
+         "name" : "PU#0",
+         "ports" : [
+            {
+               "id" : 0
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 1,
+            "delay" : 0.50,
+            "mem" : 32000,
+            "storage" : 150
+         },
+         "supported" : [ "ovs" ],
+         "type" : "EE"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "PU#6",
+         "name" : "PU#6",
+         "ports" : [
+            {
+               "id" : 1
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 1,
+            "delay" : 0.50,
+            "mem" : 32000,
+            "storage" : 150
+         },
+         "supported" : [ "trafficGenerator" ],
+         "type" : "EE"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "Core#0",
+         "name" : "Core#0",
+         "ports" : [
+            {
+               "id" : 3
+            },
+            {
+               "id" : 5
+            },
+            {
+               "id" : 6
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 0,
+            "delay" : 0.50,
+            "mem" : 0,
+            "storage" : 0
+         },
+         "type" : "SDN-SWITCH"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "PU#1",
+         "name" : "PU#1",
+         "ports" : [
+            {
+               "id" : 7
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 1,
+            "delay" : 0.50,
+            "mem" : 32000,
+            "storage" : 150
+         },
+         "supported" : [ "ovs" ],
+         "type" : "EE"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "PU#7",
+         "name" : "PU#7",
+         "ports" : [
+            {
+               "id" : 8
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 1,
+            "delay" : 0.50,
+            "mem" : 32000,
+            "storage" : 150
+         },
+         "supported" : [ "trafficGenerator" ],
+         "type" : "EE"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "Core#1",
+         "name" : "Core#1",
+         "ports" : [
+            {
+               "id" : 10
+            },
+            {
+               "id" : 12
+            },
+            {
+               "id" : 13
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 0,
+            "delay" : 0.50,
+            "mem" : 0,
+            "storage" : 0
+         },
+         "type" : "SDN-SWITCH"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "PU#2",
+         "name" : "PU#2",
+         "ports" : [
+            {
+               "id" : 14
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 1,
+            "delay" : 0.50,
+            "mem" : 32000,
+            "storage" : 150
+         },
+         "supported" : [ "trafficGenerator" ],
+         "type" : "EE"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "PU#8",
+         "name" : "PU#8",
+         "ports" : [
+            {
+               "id" : 15
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 1,
+            "delay" : 0.50,
+            "mem" : 32000,
+            "storage" : 150
+         },
+         "supported" : [ "trafficGenerator" ],
+         "type" : "EE"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "Core#2",
+         "name" : "Core#2",
+         "ports" : [
+            {
+               "id" : 17
+            },
+            {
+               "id" : 19
+            },
+            {
+               "id" : 20
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 0,
+            "delay" : 0.50,
+            "mem" : 0,
+            "storage" : 0
+         },
+         "type" : "SDN-SWITCH"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "PU#3",
+         "name" : "PU#3",
+         "ports" : [
+            {
+               "id" : 21
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 1,
+            "delay" : 0.50,
+            "mem" : 32000,
+            "storage" : 150
+         },
+         "supported" : [ "trafficGenerator" ],
+         "type" : "EE"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "PU#9",
+         "name" : "PU#9",
+         "ports" : [
+            {
+               "id" : 22
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 1,
+            "delay" : 0.50,
+            "mem" : 32000,
+            "storage" : 150
+         },
+         "supported" : [ "trafficGenerator" ],
+         "type" : "EE"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "Core#3",
+         "name" : "Core#3",
+         "ports" : [
+            {
+               "id" : 24
+            },
+            {
+               "id" : 26
+            },
+            {
+               "id" : 27
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 0,
+            "delay" : 0.50,
+            "mem" : 0,
+            "storage" : 0
+         },
+         "type" : "SDN-SWITCH"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "PU#4",
+         "name" : "PU#4",
+         "ports" : [
+            {
+               "id" : 28
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 1,
+            "delay" : 0.50,
+            "mem" : 32000,
+            "storage" : 150
+         },
+         "supported" : [ "trafficGenerator" ],
+         "type" : "EE"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "PU#10",
+         "name" : "PU#10",
+         "ports" : [
+            {
+               "id" : 29
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 1,
+            "delay" : 0.50,
+            "mem" : 32000,
+            "storage" : 150
+         },
+         "supported" : [ "trafficGenerator" ],
+         "type" : "EE"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "Core#4",
+         "name" : "Core#4",
+         "ports" : [
+            {
+               "id" : 31
+            },
+            {
+               "id" : 33
+            },
+            {
+               "id" : 34
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 0,
+            "delay" : 0.50,
+            "mem" : 0,
+            "storage" : 0
+         },
+         "type" : "SDN-SWITCH"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "PU#5",
+         "name" : "PU#5",
+         "ports" : [
+            {
+               "id" : 35
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 1,
+            "delay" : 0.50,
+            "mem" : 32000,
+            "storage" : 150
+         },
+         "supported" : [ "trafficGenerator" ],
+         "type" : "EE"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "PU#11",
+         "name" : "PU#11",
+         "ports" : [
+            {
+               "id" : 36
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 1,
+            "delay" : 0.50,
+            "mem" : 32000,
+            "storage" : 150
+         },
+         "supported" : [ "trafficGenerator" ],
+         "type" : "EE"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "Core#5",
+         "name" : "Core#5",
+         "ports" : [
+            {
+               "id" : 38
+            },
+            {
+               "id" : 40
+            },
+            {
+               "id" : 41
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 0,
+            "delay" : 0.50,
+            "mem" : 0,
+            "storage" : 0
+         },
+         "type" : "SDN-SWITCH"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "L3!0",
+         "name" : "L3!0",
+         "ports" : [
+            {
+               "id" : 43
+            },
+            {
+               "id" : 45
+            },
+            {
+               "id" : 47
+            },
+            {
+               "id" : 49
+            },
+            {
+               "id" : 51
+            },
+            {
+               "id" : 53
+            },
+            {
+               "id" : 54
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 0,
+            "delay" : 0.50,
+            "mem" : 0,
+            "storage" : 0
+         },
+         "type" : "SDN-SWITCH"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "0000:11:00.0",
+         "name" : "0000:11:00.0",
+         "ports" : [
+            {
+               "id" : 58
+            },
+            {
+               "id" : 59
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 0,
+            "delay" : 0.50,
+            "mem" : 0,
+            "storage" : 0
+         },
+         "type" : "SDN-SWITCH"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "0000:11:00.1",
+         "name" : "0000:11:00.1",
+         "ports" : [
+            {
+               "id" : 62
+            },
+            {
+               "id" : 63
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 0,
+            "delay" : 0.50,
+            "mem" : 0,
+            "storage" : 0
+         },
+         "type" : "SDN-SWITCH"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "PCIBridge!0",
+         "name" : "PCIBridge!0",
+         "ports" : [
+            {
+               "id" : 65
+            },
+            {
+               "id" : 67
+            },
+            {
+               "id" : 68
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 0,
+            "delay" : 0.50,
+            "mem" : 0,
+            "storage" : 0
+         },
+         "type" : "SDN-SWITCH"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "PCIBridge!1",
+         "name" : "PCIBridge!1",
+         "ports" : [
+            {
+               "id" : 74
+            },
+            {
+               "id" : 76
+            },
+            {
+               "id" : 78
+            },
+            {
+               "id" : 80
+            },
+            {
+               "id" : 81
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 0,
+            "delay" : 0.50,
+            "mem" : 0,
+            "storage" : 0
+         },
+         "type" : "SDN-SWITCH"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "HostBridge!0",
+         "name" : "HostBridge!0",
+         "ports" : [
+            {
+               "id" : 83
+            },
+            {
+               "id" : 85
+            },
+            {
+               "id" : 87
+            },
+            {
+               "id" : 88
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 0,
+            "delay" : 0.50,
+            "mem" : 0,
+            "storage" : 0
+         },
+         "type" : "SDN-SWITCH"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "Machine#0",
+         "name" : "Machine#0",
+         "ports" : [
+            {
+               "id" : 90
+            },
+            {
+               "id" : 92
+            },
+            {
+               "id" : 93
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 0,
+            "delay" : 0.50,
+            "mem" : 0,
+            "storage" : 0
+         },
+         "type" : "SDN-SWITCH"
+      }
+   ],
+   "node_saps" : [
+      {
+         "id" : "eth40-dione",
+         "name" : "eth40-dione",
+         "ports" : [
+            {
+               "id" : 55
+            }
+         ]
+      },
+      {
+         "id" : "dpdk0",
+         "name" : "dpdk0",
+         "ports" : [
+            {
+               "id" : 56
+            }
+         ]
+      },
+      {
+         "id" : "dpdk1-dione",
+         "name" : "dpdk1-dione",
+         "ports" : [
+            {
+               "id" : 60
+            }
+         ]
+      },
+      {
+         "id" : "eth0-dione",
+         "name" : "eth0-dione",
+         "ports" : [
+            {
+               "id" : 69
+            }
+         ]
+      },
+      {
+         "id" : "eth1-dione",
+         "name" : "eth1-dione",
+         "ports" : [
+            {
+               "id" : 70
+            }
+         ]
+      },
+      {
+         "id" : "eth2-dione",
+         "name" : "eth2-dione",
+         "ports" : [
+            {
+               "id" : 71
+            }
+         ]
+      },
+      {
+         "id" : "eth3-dione",
+         "name" : "eth3-dione",
+         "ports" : [
+            {
+               "id" : 72
+            }
+         ]
+      }
+   ],
+   "parameters" : {
+      "id" : "dione",
+      "name" : "NFFG-dione",
+      "version" : "1.0"
+   }
+}
