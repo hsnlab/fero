@@ -177,11 +177,11 @@ class DataplaneDomainManager(AbstractDomainManager):
 
     for link in nffg_part.sg_hops:
       if link.src.node.id.startswith("dpdk"):
-        src = link.src.node.id
+        src = link.src.node.id.split('-'))[0]
       else:
         src = link.src.node.id + str(link.src.id)
       if link.dst.node.id.startswith("dpdk"):
-        dst = link.dst.node.id
+        dst = link.dst.node.id.split('-'))[0]
       else:
         dst = link.dst.node.id + str(link.dst.id)
 

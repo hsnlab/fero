@@ -9,22 +9,22 @@ app = Flask(__name__)
 if len(sys.argv) > 1:
   OVS_DIR = sys.argv[1]
 else:
-  #OVS_DIR = "/home/sdn-tmit/src/marci/ovs-2.5.0/utilities/"
-  OVS_DIR = "/home/cart/Documents/openvswitch-2.5.1/utilities/"
+  OVS_DIR = "/home/sdn-tmit/src/marci/ovs-2.5.0/utilities/"
+  #OVS_DIR = "/home/cart/Documents/openvswitch-2.5.1/utilities/"
 DPDK_DIR = "/home/sdn-tmit/src/marci/dpdk-patched"
 DBR = "dpdk_br"
 SERVER = '192.168.56.103'
+
+SUPPORTED_VNFS=["simpleForwarder", "trafficGenerator"]
 
 @app.errorhandler(500)
 def error_msg(error=None):
   message={'status': 500, 'message': str(error)}
   return json.dumps(message), 500, {'Content-Type': 'text/application/json'}
 
-
 @app.route('/')
 def api_root ():
   return 'Welcome'
-
 
 @app.route('/ovsports')
 def api_ovsports ():
@@ -33,7 +33,6 @@ def api_ovsports ():
   for port in res["data"]:
     portlist[port[0]]=port[1]
   return json.dumps(portlist), 200, {'Content-Type': 'text/application/json'}
-
 
 @app.route('/ovsflows')
 def api_ovsflows ():
@@ -59,7 +58,7 @@ def api_start ():
   data=request.json
 
   nftype=data['nf_type'].encode() 
-  if nftype != "ovs":
+  if nftype is not in SUPPORTED_VNFS:
     return error_msg("Not implemented NF type")
 
   ports=data['nf_ports']
@@ -69,13 +68,24 @@ def api_start ():
     return error_msg("Too many ports")
 
   mem=data["mem"]
-  core=(data['infra_id'].split('#'))[1]
-  #The bottom two ports are reserved for OVS, thus temporary shift it
-  if int(core) < 4:
-    core=str(int(core)*4)
-  nf=data['nf_id'].encode() 
 
-  params=["sudo", "docker", "run", "-d"]
+  #Core ID 0..11
+  core=(data['infra_id'].split('#'))[1]
+
+  #Convert from PU ID to hexa portmask
+  mask=pow(2,int(core))
+  if nftype == "trafficGenerator":
+    mask=mask+2*mask
+  hexcore=hex(mask)
+
+  nf=data['nf_id'].encode() 
+  
+  params=[]
+
+  if nftype == "trafficGenerator":
+    params += ["sudo", "docker", "run", "--cap-add", "SYS_ADMIN", "-d"]
+  else:
+    params += ["sudo", "docker", "run", "-d"]
 
   #Dict to store port name and ovs portnum mappings
   ovs_ports=dict()	 
@@ -96,19 +106,34 @@ def api_start ():
     ovs_ports[ovs_port]=portnum.rstrip()					
     params += ["-v", "/usr/local/var/run/openvswitch/" +
                ovs_port + ":/var/run/usvhost" + str(x)]
-    
-  params += ["-v", "/dev/hugepages:/dev/hugepages","dpdk-test",
-                 "./examples/l2fwd/build/l2fwd", "-c", "0x" + core ,
+
+  if nftype == "simpleForwarder": 
+    params += ["-v", "/dev/hugepages:/dev/hugepages","dpdk-test",
+                 "./examples/l2fwd/build/l2fwd", "-c", hexcore ,
                  "-n", "4", "-m", str(mem) , "--no-pci",
-                 "--single-file", "--file-prefix", nf]
-				 
-  x=0
-  for port in ports:
-    x += 1
-    params += ["--vdev=eth_cvio" + str(x) + ",path=/var/run/usvhost" + str(x)]
-  # DPDK core mask	  
-  params += ["--", "-p", "0x" + str(pow(2,x)-1)] 
-               
+                 "--single-file", "--file-prefix", nf]				 
+    x=0
+    for port in ports:
+      x += 1
+      params += ["--vdev=eth_cvio" + str(x) + ",path=/var/run/usvhost" + str(x)]
+
+    # DPDK core mask	  
+    params += ["--", "-p", "0x" + str(pow(2,x)-1)] 
+
+  else:
+    params += ["-v", "/dev/hugepages:/dev/hugepages","dpdk-pktgen",
+                 "./app/app/x86_64-native-linuxapp-gcc/pktgen", "-c", hexcore ,
+                 "-n", "4", "-m", str(mem) , "--no-pci", "--file-prefix", nf]				 
+    x=0
+    for port in ports:
+      x += 1
+      params += ["--vdev=virtio_user" + str(x) + ",path=/var/run/usvhost" + str(x)]  
+
+    # DPDK core mask
+    coreid=int(core)+1	  
+    params += ["--", "-P", "-m", str(coreid) + ".0", "-f", "./testconfig.lua"] 
+
+           
   # Get container ID
   proc=subprocess.Popen(params, stdout=subprocess.PIPE) 	
   cid=proc.stdout.readline().rstrip()
