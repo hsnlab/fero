@@ -83,7 +83,7 @@ def api_start ():
   params=[]
 
   if nftype == "trafficGenerator":
-    params += ["sudo", "docker", "run", "--cap-add", "SYS_ADMIN", "-d"]
+    params += ["sudo", "docker", "run", "-i", "--cap-add", "SYS_ADMIN"]
   else:
     params += ["sudo", "docker", "run", "-d"]
 
@@ -108,7 +108,7 @@ def api_start ():
                ovs_port + ":/var/run/usvhost" + str(x)]
 
   if nftype == "simpleForwarder": 
-    params += ["-v", "/dev/hugepages:/dev/hugepages","dpdk-test",
+    params += ["-v", "/dev/hugepages:/dev/hugepages","dpdk-l2fwd",
                  "./examples/l2fwd/build/l2fwd", "-c", hexcore ,
                  "-n", "4", "-m", str(mem) , "--no-pci",
                  "--single-file", "--file-prefix", nf]				 
