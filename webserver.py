@@ -9,8 +9,8 @@ app = Flask(__name__)
 if len(sys.argv) > 1:
   OVS_DIR = sys.argv[1]
 else:
-  OVS_DIR = "/home/sdn-tmit/src/marci/ovs-2.5.0/utilities/"
-  #OVS_DIR = "/home/cart/Documents/openvswitch-2.5.1/utilities/"
+  #OVS_DIR = "/home/sdn-tmit/src/marci/ovs-2.5.0/utilities/"
+  OVS_DIR = "/home/cart/Documents/dpdktest/ovs/utilities/"
 DPDK_DIR = "/home/sdn-tmit/src/marci/dpdk-patched"
 DBR = "dpdk_br"
 SERVER = '192.168.56.103'
@@ -44,9 +44,20 @@ def api_ovsflows ():
 @app.route('/addflow', methods=['POST'])
 def api_addflow ():
   data=request.json
-  match=data["match"].encode()
-  actions=data["actions"].encode()
-  ret=subprocess.check_output([ "sudo", OVS_DIR + "ovs-ofctl", "add-flow", DBR, match + ',' + actions])
+  match=data["match"]
+  actions=data["actions"]
+
+  flowrule="in_port=" + match["in_port"].encode()
+
+  if 'vlan_id' in match:
+    flowrule=flowrule + ",dl_vlan=" + match["vlan_id"].encode() + ",actions=pop_vlan,output:" + actions["output"].encode()
+  elif 'push_vlan' in actions:
+    flowrule=flowrule + ",actions=push_vlan:0x8100,mod_vlan_vid:" + actions["push_vlan"].encode() + ",output:" + actions["output"].encode()
+  else:
+    flowrule=flowrule + ",actions=output:" + actions["output"].encode()
+
+  ret=subprocess.check_output([ "sudo", OVS_DIR + "ovs-ofctl", "add-flow", DBR, flowrule, "-O", "OpenFlow12"])
+
   if ret.rstrip() == "":
     return 'OK', 200
   else:
@@ -58,7 +69,7 @@ def api_start ():
   data=request.json
 
   nftype=data['nf_type'].encode() 
-  if nftype is not in SUPPORTED_VNFS:
+  if nftype not in SUPPORTED_VNFS:
     return error_msg("Not implemented NF type")
 
   ports=data['nf_ports']

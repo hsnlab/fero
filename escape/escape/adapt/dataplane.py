@@ -118,8 +118,10 @@ class DataplaneDomainManager(AbstractDomainManager):
     """
     log.info(">>> Install %s domain part..." % self.domain_name)
 
+    print nffg_part.dump()
+    
     nffg_part.clear_links(NFFG.TYPE_LINK_REQUIREMENT)
-    un_topo = self.topoAdapter.topo
+    un_topo = self.topoAdapter.get_topology_resource()
 
     for infra in nffg_part.infras:
 
@@ -132,23 +134,26 @@ class DataplaneDomainManager(AbstractDomainManager):
 
       for nf in nffg_part.running_nfs(infra.id):
 
+        for u, v, link in nffg_part.real_out_edges_iter(nf.id):
+          dyn_port = nffg_part[v].ports[link.dst.id]
+          dyn_port.id=link.dst.id.translate(None, '|').replace(infra.id, '')
+
         if nf.id in (nf.id for nf in un_topo.nfs):
           log.debug("NF: %s has already been initiated. Continue to next NF..."
                     % nf.short_name)
           continue
-
+        """
         params = {'nf_type': nf.functional_type,
                   'nf_id': nf.id,
                   'nf_ports': [
-                    link.dst.id.translate(None, '|').replace(infra.id, '') for
-                    u, v, link in
+                    link.dst.id for u, v, link in
                     nffg_part.real_out_edges_iter(nf.id)], 'infra_id': infra.id}
 
         result = self.remoteAdapter.start(**params)
 
         if result is not None:
           self.deployed_vnfs[nf.id] = result
-
+        """
         # Add initiated NF to topo description
         log.info("Update Infrastructure layer topology description...")
         deployed_nf = nf.copy()
@@ -161,7 +166,7 @@ class DataplaneDomainManager(AbstractDomainManager):
           nf_port = deployed_nf.ports.append(nf.ports[link.src.id].copy())
           # Create INFRA side Port
           infra_port = un_topo.network.node[infra_id].add_port(
-            id=link.dst.id.translate(None, '|').replace(infra.id, ''))
+            id=link.dst.id)
           log.debug("%s - detected physical %s" % (deployed_nf, infra_port))
           # Add Links to un topo
           l1, l2 = un_topo.add_undirected_link(port1=nf_port, port2=infra_port,
@@ -170,48 +175,51 @@ class DataplaneDomainManager(AbstractDomainManager):
 
         log.debug("%s topology description is updated with NF: %s" % (
           self.domain_name, deployed_nf.name))
-
+    """
     ports = self.remoteAdapter.ovsports()
 
     # Add flow rules based on sg hops in the actual request
 
     for link in nffg_part.sg_hops:
+      vlan_match=None
+      vlan_tag=None
       if link.src.node.id.startswith("dpdk"):
         src = link.src.node.id.split('-')[0]
+        vlan_match=link.id
       else:
         src = link.src.node.id + str(link.src.id)
       if link.dst.node.id.startswith("dpdk"):
         dst = link.dst.node.id.split('-')[0]
+        vlan_tag=link.id
+        if len(link.dst.node.id.split('-')) > 1:
+          vlan_tag=str(int(vlan_tag)+1)
       else:
         dst = link.dst.node.id + str(link.dst.id)
 
-      match = "in_port=" + str(ports[src])
-      actions = "actions=output:" + str(ports[dst])
+      flowrule = {'match': {},
+                  'actions': {}
+                 }
 
-      self.remoteAdapter.addflow(match, actions)
+      flowrule['match']['in_port'] = str(ports[src])
+      if vlan_match is not None:
+        flowrule['match']['vlan_id'] = str(vlan_match)
 
+      flowrule['actions']['output'] = str(ports[dst])
+      if vlan_tag is not None:
+        flowrule['actions']['push_vlan'] = str(vlan_tag)
+
+      self.remoteAdapter.addflow(flowrule)
+      """
+
+    print self.topoAdapter.get_topology_resource().dump()
     return True
 
   def clear_domain (self):
     """
-    Infrastructure Layer has already been stopped and probably cleared.
-
-    Skip cleanup process here.
-
     :return: cleanup result
     :rtype: bool
-   
-    if not self.topoAdapter.check_domain_reachable():
-      # This would be the normal behaviour if ESCAPEv2 is shutting down -->
-      # Infrastructure layer has been cleared.
-      log.debug("%s domain has already been cleared!" % self.domain_name)
-      return True
-    # something went wrong ??
-    return False
-     """
-
-    #topo = self.topoAdapter.get_topology_resource()
-    topo = self.topoAdapter.topo
+    """
+    topo = self.topoAdapter.get_topology_resource()
     if topo is None:
       log.warning("Missing topology description from %s domain! "
                   "Skip deleting NFs..." % self.domain_name)
@@ -310,11 +318,51 @@ class DataplaneTopologyAdapter(AbstractESCAPEAdapter):
         raise RuntimeError(raw_data)
     # Parse raw data
     topo = NFFG.parse(raw_data)
+    # Modify static topo
+    self.setup_topology(topo)
     # Duplicate links for bidirectional connections
     topo.duplicate_static_links()
     # Rewrite infra domains
-    return self.rewrite_domain(nffg=topo)
+    self.cache = self.rewrite_domain(nffg=topo)
+    # print self.cache.dump()
+    return self.cache
 
+  def setup_topology(self, nffg):
+    """
+    Modify the hwloc topology according to the config file.
+
+    :return: the modified topology description
+    :rtype: :any:`NFFG`
+    """   
+    params=CONFIG.get_un_params()
+      
+    saps= [sap.id for sap in nffg.saps]
+
+    for infra in nffg.infras:
+
+      connected_saps = [link for u, v, link in nffg.real_out_edges_iter(infra.id)
+                        if link.dst.node.id in saps]
+
+      for link in connected_saps:
+        if link.dst.node.id in params["inner_saps"]:
+          continue
+        else:
+          old_id=link.dst.node.id
+          new_sap=link.dst.node
+          new_sap.id=link.dst.node.id + "-" + params["domain"]
+          new_sap.name=link.dst.node.name + "-" + params["domain"]
+          nffg.add_sap(sap_obj=new_sap)
+          nffg.del_node(old_id)
+          nffg.add_link(link.src,link.dst,link=link)
+
+      if infra.infra_type not in (
+        NFFG.TYPE_INFRA_EE, NFFG.TYPE_INFRA_STATIC_EE):
+        continue
+      elif infra.id in params["ovs_pus"]:
+        infra.supported=["ovs"]
+      else:
+        infra.supported=[sup for sup in params["supported_vnfs"]]
+    return nffg
 
 class DefaultDataplaneDomainAPI(object):
   """

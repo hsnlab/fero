@@ -793,6 +793,20 @@ class ESCAPEConfig(object):
     except (KeyError, AttributeError, TypeError):
       return {}
 
+  def get_un_params (self):
+    """ 
+    Return dataplane params.
+
+    :return: additional parameters as a dict (default: empty dict)
+    :rtype: dict
+    """
+    try:
+      cfg = self.__configuration[INFR]["UN"]
+      return cfg if cfg is not None else {}
+    except (KeyError, AttributeError, TypeError):
+      return {}
+
+
   ##############################################################################
   # Visualizations layer getters
   ##############################################################################
