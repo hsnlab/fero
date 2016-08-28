@@ -142,7 +142,7 @@ class DataplaneDomainManager(AbstractDomainManager):
           log.debug("NF: %s has already been initiated. Continue to next NF..."
                     % nf.short_name)
           continue
-        """
+
         params = {'nf_type': nf.functional_type,
                   'nf_id': nf.id,
                   'nf_ports': [
@@ -153,7 +153,7 @@ class DataplaneDomainManager(AbstractDomainManager):
 
         if result is not None:
           self.deployed_vnfs[nf.id] = result
-        """
+
         # Add initiated NF to topo description
         log.info("Update Infrastructure layer topology description...")
         deployed_nf = nf.copy()
@@ -175,7 +175,7 @@ class DataplaneDomainManager(AbstractDomainManager):
 
         log.debug("%s topology description is updated with NF: %s" % (
           self.domain_name, deployed_nf.name))
-    """
+
     ports = self.remoteAdapter.ovsports()
 
     # Add flow rules based on sg hops in the actual request
@@ -188,11 +188,12 @@ class DataplaneDomainManager(AbstractDomainManager):
         vlan_match=link.id
       else:
         src = link.src.node.id + str(link.src.id)
+
       if link.dst.node.id.startswith("dpdk"):
         dst = link.dst.node.id.split('-')[0]
         vlan_tag=link.id
         if len(link.dst.node.id.split('-')) > 1:
-          vlan_tag=str(int(vlan_tag)+1)
+          vlan_tag="1"
       else:
         dst = link.dst.node.id + str(link.dst.id)
 
@@ -208,8 +209,7 @@ class DataplaneDomainManager(AbstractDomainManager):
       if vlan_tag is not None:
         flowrule['actions']['push_vlan'] = str(vlan_tag)
 
-      self.remoteAdapter.addflow(flowrule)
-      """
+      self.remoteAdapter.addflow(**flowrule)
 
     print self.topoAdapter.get_topology_resource().dump()
     return True
