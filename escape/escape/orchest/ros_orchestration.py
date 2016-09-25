@@ -49,6 +49,56 @@ class ResourceOrchestrator(AbstractOrchestrator):
     self.nfibManager = NFIBManager()
     self.nfibManager.initialize()
 
+  def preprocess_nffg(self, nffg):
+
+    nfs = [nf for nf in nffg.nfs]
+    for nf in nfs:
+      if nf.resources.cpu > 1:
+        in_nf = nf.copy()
+        in_nf.ports.clear()
+        in_nf.resources.cpu=0
+        in_nf.id=nf.id + "-in"
+        nffg.add_nf(nf=in_nf)
+        out_nf = nf.copy()
+        out_nf.ports.clear()
+        out_nf.resources.cpu=0
+        out_nf.id=nf.id + "-out"
+        nffg.add_nf(nf=out_nf)
+
+        hops= [hop for hop in nffg.sg_hops]
+        for hop in hops:
+          if hop.dst.node.id == nf.id:
+            in_port = nffg.network.node[in_nf.id].add_port(id=hop.dst.id)
+            old_hop=hop
+            old_hop.dst=in_port
+            nffg.del_edge(hop.src,hop.dst,hop.id)
+            nffg.add_sglink(hop.src,in_port,hop=old_hop)
+
+          if hop.src.node.id == nf.id:
+            out_port = nffg.network.node[out_nf.id].add_port(id=hop.src.id)
+            old_hop=hop
+            old_hop.src=out_port
+            nffg.del_edge(hop.src,hop.dst,hop.id)
+            nffg.add_sglink(out_port,hop.dst,hop=old_hop)
+
+        vport_in=in_nf.add_port()
+        vport_out=out_nf.add_port()
+
+        for i in range(int(nf.resources.cpu)):
+          new_nf=nf.copy()
+          new_nf.ports.clear()
+          new_nf.resources.cpu=1
+          new_nf.id=nf.id + "-core" + str(i)
+          nffg.add_nf(nf=new_nf)
+          new_port1=new_nf.add_port()
+          nffg.add_sglink(vport_in,new_port1) 
+          new_port2=new_nf.add_port()
+          nffg.add_sglink(new_port2,vport_out)         
+
+        nffg.del_node(nf.id)
+
+    return nffg
+
   def instantiate_nffg (self, nffg):
     """
     Main API function for NF-FG instantiation.
@@ -58,6 +108,7 @@ class ResourceOrchestrator(AbstractOrchestrator):
     :return: mapped NFFG instance
     :rtype: :any:`NFFG`
     """
+
     log.debug("Invoke %s to instantiate given NF-FG" % self.__class__.__name__)
     # Store newly created NF-FG
     self.nffgManager.save(nffg)
@@ -69,6 +120,7 @@ class ResourceOrchestrator(AbstractOrchestrator):
     # Log verbose mapping request
     log.log(VERBOSE, "Orchestration Layer request graph:\n%s" % nffg.dump())
     # Start Orchestrator layer mapping
+    self.preprocess_nffg(nffg)
     if global_view is not None:
       if isinstance(global_view, AbstractVirtualizer):
         # If the request is a bare NFFG, it is probably an empty topo for domain

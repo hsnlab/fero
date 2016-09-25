@@ -9,8 +9,8 @@ app = Flask(__name__)
 if len(sys.argv) > 1:
   OVS_DIR = sys.argv[1]
 else:
-  #OVS_DIR = "/home/sdn-tmit/src/marci/ovs-2.5.0/utilities/"
-  OVS_DIR = "/home/cart/Documents/dpdktest/ovs/utilities/"
+  OVS_DIR = "/home/sdn-tmit/src/marci/ovs/utilities/"
+  #OVS_DIR = "/home/cart/Documents/dpdktest/ovs/utilities/"
 DPDK_DIR = "/home/sdn-tmit/src/marci/dpdk-patched"
 DBR = "dpdk_br"
 SERVER = '192.168.56.103'
@@ -74,19 +74,20 @@ def api_start ():
 
   ports=data['nf_ports']
 
-  #Currently only 1 port NFs are supported
-  if len(ports) > 1:
-    return error_msg("Too many ports")
-
   mem=data["mem"]
 
-  #Core ID 0..11
-  core=(data['infra_id'].split('#'))[1]
+  #Cores
+  cores=data['infra_id']
+  coreids = [int(core.split('#')[1]) for core in cores]
+
+  #At least 1 core/port needs to be allocated
+  if len(ports) > len(cores):
+    return error_msg("Not enough cores")
 
   #Convert from PU ID to hexa portmask
-  mask=pow(2,int(core))
-  if nftype == "trafficGenerator":
-    mask=mask+2*mask
+  mask=0
+  for core in coreids:
+    mask = mask + pow(2,core)
   hexcore=hex(mask)
 
   nf=data['nf_id'].encode() 
@@ -94,9 +95,9 @@ def api_start ():
   params=[]
 
   if nftype == "trafficGenerator":
-    params += ["sudo", "docker", "run", "-i", "--cap-add", "SYS_ADMIN"]
+    params += ["sudo", "docker", "run", "-t", "-d", "--cap-add", "SYS_ADMIN"]
   else:
-    params += ["sudo", "docker", "run", "-d"]
+    params += ["sudo", "docker", "run", "-t", "-d", "--cap-add", "SYS_ADMIN"]
 
   #Dict to store port name and ovs portnum mappings
   ovs_ports=dict()	 
@@ -104,48 +105,55 @@ def api_start ():
   x=0
   for port in ports:
     ovs_port=port.encode()
-    x += 1
-    #Add port to the bridge.
+    #Add port to the OVS bridge.
     subprocess.call(["sudo", OVS_DIR + "ovs-vsctl", "add-port", DBR,		
                      ovs_port , "--", "set", "Interface",ovs_port ,
                      "type=dpdkvhostuser"])
 
-    #Get openflow portnum of the new port.
+    #Get openflow portnum of the newly created port.
     portnum=subprocess.check_output(["sudo", OVS_DIR + "ovs-vsctl" ,
                                      "get", "Interface", ovs_port, "ofport"])
+
     #Store it.
     ovs_ports[ovs_port]=portnum.rstrip()					
     params += ["-v", "/usr/local/var/run/openvswitch/" +
                ovs_port + ":/var/run/usvhost" + str(x)]
+    x += 1
 
   if nftype == "simpleForwarder": 
     params += ["-v", "/dev/hugepages:/dev/hugepages","dpdk-l2fwd",
                  "./examples/l2fwd/build/l2fwd", "-c", hexcore ,
-                 "-n", "4", "-m", str(mem) , "--no-pci",
-                 "--single-file", "--file-prefix", nf]				 
+                 "-n", "4", "-m", str(mem) , "--no-pci", "--file-prefix", nf]				 
     x=0
     for port in ports:
+      params += ["--vdev=virtio_user" + str(x) + ",path=/var/run/usvhost" + str(x)]
       x += 1
-      params += ["--vdev=eth_cvio" + str(x) + ",path=/var/run/usvhost" + str(x)]
 
     # DPDK core mask	  
-    params += ["--", "-p", "0x" + str(pow(2,x)-1)] 
+    params += ["--", "-p", "0x" + str(pow(2,len(ports))-1)] 
 
   else:
     params += ["-v", "/dev/hugepages:/dev/hugepages","dpdk-pktgen",
                  "./app/app/x86_64-native-linuxapp-gcc/pktgen", "-c", hexcore ,
-                 "-n", "4", "-m", str(mem) , "--no-pci", "--file-prefix", nf]				 
+                 "-n", "4", "-m", str(mem) , "--no-pci", "--file-prefix", nf]	
+
+    # The lowest port is reserved for display and timers
+    coreids.remove(min(coreids))
+    # PKTGEN port setup: each rx/tx pair handled by 1 different core
+    pktgen_param= None		 
     x=0
     for port in ports:
+      params += ["--vdev=virtio_user" + str(x) + ",path=/var/run/usvhost" + str(x)]
+      if pktgen_param is None:
+        pktgen_param = str(coreids[x]) + "." + str(x)
+      else:
+        pktgen_param = pktgen_param + ", " + str(coreids[x]) + "." + str(x) 
       x += 1
-      params += ["--vdev=virtio_user" + str(x) + ",path=/var/run/usvhost" + str(x)]  
 
     # DPDK core mask
-    coreid=int(core)+1	  
-    params += ["--", "-P", "-m", str(coreid) + ".0", "-f", "./testconfig.lua"] 
-
-           
-  # Get container ID
+    params += ["--", "-P", "-m", pktgen_param, "-f", "./testconfig.lua"] 
+        
+  # Get newly initiated container ID
   proc=subprocess.Popen(params, stdout=subprocess.PIPE) 	
   cid=proc.stdout.readline().rstrip()
 

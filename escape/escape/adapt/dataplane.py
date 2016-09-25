@@ -123,38 +123,67 @@ class DataplaneDomainManager(AbstractDomainManager):
     nffg_part.clear_links(NFFG.TYPE_LINK_REQUIREMENT)
     un_topo = self.topoAdapter.get_topology_resource()
 
-    for infra in nffg_part.infras:
+    # Remove special characters from infra side NF port id
+    for nf in nffg_part.nfs:
+      for u, v, link in nffg_part.real_out_edges_iter(nf.id):
+        dyn_port = nffg_part[v].ports[link.dst.id]
+        dyn_port.id=link.dst.id.translate(None, '|').replace(link.dst.node.id, '')
+      
+    for nf in nffg_part.nfs:
 
-      if infra.id not in (n.id for n in un_topo.infras):
-        log.error("Infrastructure Node: %s is not found in the %s domain! "
-                  "Skip NF initiation on this Node..." %
-                  (infra.short_name, self.domain_name))
-        result = False
-        continue
+      ports=[]
+      cores=[]
 
-      for nf in nffg_part.running_nfs(infra.id):
-
-        for u, v, link in nffg_part.real_out_edges_iter(nf.id):
-          dyn_port = nffg_part[v].ports[link.dst.id]
-          dyn_port.id=link.dst.id.translate(None, '|').replace(infra.id, '')
+      if len(nf.id.split('-')) == 1:
 
         if nf.id in (nf.id for nf in un_topo.nfs):
           log.debug("NF: %s has already been initiated. Continue to next NF..."
                     % nf.short_name)
           continue
 
+        ports = [link.dst.id for u, v, link in
+                   nffg_part.real_out_edges_iter(nf.id)]
+
+        cores = [link.dst.node.id for u, v, link in
+                   nffg_part.real_out_edges_iter(nf.id)]
+
+
+      elif nf.id.split('-')[0] not in self.deployed_vnfs:
+        act_nf=nf.id.split('-')[0]
+        nf_parts=[nf for nf in nffg_part.nfs if nf.id.startswith(act_nf)]
+
+        ports=[]
+        cores=[]
+
+        for n in nf_parts:
+          if n.id.split('-')[1].startswith("core"):
+            for u, v, link in nffg_part.real_out_edges_iter(n.id):
+              cores.append(link.dst.node.id)
+              break
+          else:
+            for u, v, link in nffg_part.real_out_edges_iter(n.id):
+              if len(link.dst.id.split('-')) < 3:
+                ports.append(link.dst.id)
+                break                        
+
         params = {'nf_type': nf.functional_type,
-                  'nf_id': nf.id,
-                  'nf_ports': [
-                    link.dst.id for u, v, link in
-                    nffg_part.real_out_edges_iter(nf.id)], 'infra_id': infra.id}
+                  'nf_id': nf.id.split('-')[0],
+                  'nf_ports': [port for port in ports],
+                  'infra_id': [core for core in cores]}
 
-        result = self.remoteAdapter.start(**params)
+      print (params)
 
-        if result is not None:
-          self.deployed_vnfs[nf.id] = result
+      self.deployed_vnfs[nf.id.split('-')[0]]="aaaaa"
 
-        # Add initiated NF to topo description
+      """
+      result = self.remoteAdapter.start(**params)
+
+      if result is not None:
+        self.deployed_vnfs[nf.id.split('-')[0]] = result
+      """
+
+      if nf.id.split('-')[1].startswith("core") or len(nf.id.split('-')) == 1:
+        # Add initiated NF to topo description if not virtual
         log.info("Update Infrastructure layer topology description...")
         deployed_nf = nf.copy()
         deployed_nf.ports.clear()
@@ -173,14 +202,26 @@ class DataplaneDomainManager(AbstractDomainManager):
                                                dynamic=True, delay=link.delay,
                                                bandwidth=link.bandwidth)
 
-        log.debug("%s topology description is updated with NF: %s" % (
-          self.domain_name, deployed_nf.name))
+          log.debug("%s topology description is updated with NF: %s" % (
+            self.domain_name, deployed_nf.name))
 
+    #self.install_flowrules(nffg_part)
+
+    print self.topoAdapter.get_topology_resource().dump()
+    return True
+
+
+  def install_flowrules (self, nffg):
+    
     ports = self.remoteAdapter.ovsports()
 
     # Add flow rules based on sg hops in the actual request
 
-    for link in nffg_part.sg_hops:
+    for link in nffg.sg_hops:
+
+      if len(link.id.split('-')) > 1:
+        continue
+
       vlan_match=None
       vlan_tag=None
       if link.src.node.id.startswith("dpdk"):
@@ -211,8 +252,6 @@ class DataplaneDomainManager(AbstractDomainManager):
 
       self.remoteAdapter.addflow(**flowrule)
 
-    print self.topoAdapter.get_topology_resource().dump()
-    return True
 
   def clear_domain (self):
     """
@@ -225,6 +264,28 @@ class DataplaneDomainManager(AbstractDomainManager):
                   "Skip deleting NFs..." % self.domain_name)
       return False
 
+    for nf_id in self.deployed_vnfs:
+      for port in self.deployed_vnfs[nf_id]['ovs_ports']:
+        self.remoteAdapter.delport(port)
+
+      nf_parts=[nf for nf in topo.nfs if nf.id.startswith(nf_id)]
+
+      for nf in nf_parts:
+        # Delete ports
+        for u, v, link in topo.network.out_edges([nf.id], data=True):
+          port=link.dst.id
+          topo[v].del_port(id=port)
+
+      self.remoteAdapter.stop(self.deployed_vnfs[nf_id]['cid'])
+      topo.del_node(nf_id)
+
+    # Delete all flow rules
+    self.remoteAdapter.delflow()
+    # Infrastructure layer has been cleared.
+    log.debug("%s domain has been cleared!" % self.domain_name)
+    return True
+      
+    """
     for infra in topo.infras:
       running_nfs = [n.id for n in topo.running_nfs(infra.id)]
       for nf_id in running_nfs:
@@ -242,6 +303,7 @@ class DataplaneDomainManager(AbstractDomainManager):
     # Infrastructure layer has been cleared.
     log.debug("%s domain has been cleared!" % self.domain_name)
     return True
+    """
 
 
 class DataplaneTopologyAdapter(AbstractESCAPEAdapter):
