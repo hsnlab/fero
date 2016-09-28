@@ -20,6 +20,7 @@ from escape.orchest.nfib_mgmt import NFIBManager
 from escape.orchest.ros_mapping import ResourceOrchestrationMapper
 from escape.util.mapping import AbstractOrchestrator, ProcessorError
 from escape.util.misc import notify_remote_visualizer, VERBOSE
+from escape.nffg_lib.nffg import *
 
 
 class ResourceOrchestrator(AbstractOrchestrator):
@@ -50,6 +51,27 @@ class ResourceOrchestrator(AbstractOrchestrator):
     self.nfibManager.initialize()
 
   def preprocess_nffg(self, nffg):
+
+    try:
+      # if there is at least ONE SGHop in the graph, we don't do SGHop retrieval.
+      next(nffg.sg_hops)
+    except StopIteration:
+      # retrieve the SGHops from the TAG values of the flow rules, in case they
+      # are cannot be found in the request graph and can only be deduced from the 
+      # flows
+      log.warning("No SGHops were given in the Service Graph, retrieving them"
+                      " based on the flowrules...")
+      sg_hops_given = False
+      sg_hop_info = NFFGToolBox.retrieve_all_SGHops(nffg)
+      if len(sg_hop_info) == 0:
+        raise uet.BadInputException("If SGHops are not given, flowrules should be"
+                                    " in the NFFG",
+                                    "No SGHop could be retrieved based on the "
+                                    "flowrules of the NFFG.")
+      for k, v in sg_hop_info.iteritems():
+        # VNF ports are given to the function
+        nffg.add_sglink(v[0], v[1], flowclass=v[2], bandwidth=v[3], delay=v[4],
+                           id=k[2])
 
     nfs = [nf for nf in nffg.nfs]
     for nf in nfs:
@@ -87,7 +109,7 @@ class ResourceOrchestrator(AbstractOrchestrator):
         for i in range(int(nf.resources.cpu)):
           new_nf=nf.copy()
           new_nf.ports.clear()
-          new_nf.resources.cpu=1
+          new_nf.resources.cpu=1.0
           new_nf.id=nf.id + "-core" + str(i)
           nffg.add_nf(nf=new_nf)
           new_port1=new_nf.add_port()
@@ -120,7 +142,10 @@ class ResourceOrchestrator(AbstractOrchestrator):
     # Log verbose mapping request
     log.log(VERBOSE, "Orchestration Layer request graph:\n%s" % nffg.dump())
     # Start Orchestrator layer mapping
+    print nffg.dump()
     self.preprocess_nffg(nffg)
+    print nffg.dump()
+
     if global_view is not None:
       if isinstance(global_view, AbstractVirtualizer):
         # If the request is a bare NFFG, it is probably an empty topo for domain

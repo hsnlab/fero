@@ -152,9 +152,6 @@ class DataplaneDomainManager(AbstractDomainManager):
         act_nf=nf.id.split('-')[0]
         nf_parts=[nf for nf in nffg_part.nfs if nf.id.startswith(act_nf)]
 
-        ports=[]
-        cores=[]
-
         for n in nf_parts:
           if n.id.split('-')[1].startswith("core"):
             for u, v, link in nffg_part.real_out_edges_iter(n.id):
@@ -166,21 +163,22 @@ class DataplaneDomainManager(AbstractDomainManager):
                 ports.append(link.dst.id)
                 break                        
 
-        params = {'nf_type': nf.functional_type,
-                  'nf_id': nf.id.split('-')[0],
-                  'nf_ports': [port for port in ports],
-                  'infra_id': [core for core in cores]}
+      params = {'nf_type': nf.functional_type,
+                'nf_id': nf.id.split('-')[0],
+                'nf_ports': [port for port in ports],
+                'infra_id': [core for core in cores]}
 
-      print (params)
+      if len(params['infra_id']) > 0:
+        print (params)
 
-      self.deployed_vnfs[nf.id.split('-')[0]]="aaaaa"
+        self.deployed_vnfs[nf.id.split('-')[0]]="aaaaa"
 
-      """
-      result = self.remoteAdapter.start(**params)
+        """
+        result = self.remoteAdapter.start(**params)
 
-      if result is not None:
-        self.deployed_vnfs[nf.id.split('-')[0]] = result
-      """
+        if result is not None:
+          self.deployed_vnfs[nf.id.split('-')[0]] = result
+        """
 
       if nf.id.split('-')[1].startswith("core") or len(nf.id.split('-')) == 1:
         # Add initiated NF to topo description if not virtual
