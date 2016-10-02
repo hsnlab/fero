@@ -131,10 +131,11 @@ class DataplaneDomainManager(AbstractDomainManager):
       
     for nf in nffg_part.nfs:
 
+      act_nf=nf.id.split('-')
       ports=[]
       cores=[]
 
-      if len(nf.id.split('-')) == 1:
+      if len(act_nf) == 1:
 
         if nf.id in (nf.id for nf in un_topo.nfs):
           log.debug("NF: %s has already been initiated. Continue to next NF..."
@@ -148,9 +149,13 @@ class DataplaneDomainManager(AbstractDomainManager):
                    nffg_part.real_out_edges_iter(nf.id)]
 
 
-      elif nf.id.split('-')[0] not in self.deployed_vnfs:
-        act_nf=nf.id.split('-')[0]
-        nf_parts=[nf for nf in nffg_part.nfs if nf.id.startswith(act_nf)]
+      elif act_nf[0] not in self.deployed_vnfs:
+
+        log.debug("New sub NF detected for: %s" % act_nf[0])
+
+        nf_parts=[nf for nf in nffg_part.nfs if nf.id.startswith(act_nf[0])]
+
+        log.debug("NF parts detected: %s" % [nf.id for nf in nf_parts])
 
         for n in nf_parts:
           if n.id.split('-')[1].startswith("core"):
@@ -169,7 +174,8 @@ class DataplaneDomainManager(AbstractDomainManager):
                 'infra_id': [core for core in cores]}
 
       if len(params['infra_id']) > 0:
-        print (params)
+
+        log.debug("Starting new NF with parameters: %s" % params)
 
         self.deployed_vnfs[nf.id.split('-')[0]]="aaaaa"
 
@@ -180,8 +186,8 @@ class DataplaneDomainManager(AbstractDomainManager):
           self.deployed_vnfs[nf.id.split('-')[0]] = result
         """
 
-      if nf.id.split('-')[1].startswith("core") or len(nf.id.split('-')) == 1:
-        # Add initiated NF to topo description if not virtual
+      if nf.resources.cpu > 0:
+        # Add initiated NF to topo description if not virtual NF
         log.info("Update Infrastructure layer topology description...")
         deployed_nf = nf.copy()
         deployed_nf.ports.clear()
