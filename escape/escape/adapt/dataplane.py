@@ -153,9 +153,9 @@ class DataplaneDomainManager(AbstractDomainManager):
 
         log.debug("New sub NF detected for: %s" % act_nf[0])
 
-        nf_parts=[nf for nf in nffg_part.nfs if nf.id.startswith(act_nf[0])]
+        nf_parts=[nfpart for nfpart in nffg_part.nfs if nfpart.id.startswith(act_nf[0])]
 
-        log.debug("NF parts detected: %s" % [nf.id for nf in nf_parts])
+        log.debug("NF parts detected: %s" % [part.id for part in nf_parts])
 
         for n in nf_parts:
           if n.id.split('-')[1].startswith("core"):
@@ -169,7 +169,7 @@ class DataplaneDomainManager(AbstractDomainManager):
                 break                        
 
       params = {'nf_type': nf.functional_type,
-                'nf_id': nf.id.split('-')[0],
+                'nf_id': act_nf[0],
                 'nf_ports': [port for port in ports],
                 'infra_id': [core for core in cores]}
 
@@ -177,7 +177,7 @@ class DataplaneDomainManager(AbstractDomainManager):
 
         log.debug("Starting new NF with parameters: %s" % params)
 
-        self.deployed_vnfs[nf.id.split('-')[0]]="aaaaa"
+        self.deployed_vnfs[act_nf[0]]="aaaaa"
 
         """
         result = self.remoteAdapter.start(**params)
@@ -192,7 +192,7 @@ class DataplaneDomainManager(AbstractDomainManager):
         deployed_nf = nf.copy()
         deployed_nf.ports.clear()
         un_topo.add_nf(nf=deployed_nf)
-        log.debug("Add deployed NFs to topology...")
+        log.debug("Add deployed NF to topology: %s" % nf.id)
         # Add Link between actual NF and INFRA
         for nf_id, infra_id, link in nffg_part.real_out_edges_iter(nf.id):
           # Get Link's src ref to new NF's port
@@ -206,8 +206,11 @@ class DataplaneDomainManager(AbstractDomainManager):
                                                dynamic=True, delay=link.delay,
                                                bandwidth=link.bandwidth)
 
-          log.debug("%s topology description is updated with NF: %s" % (
+
+        log.debug("%s topology description is updated with NF: %s" % (
             self.domain_name, deployed_nf.name))
+      else:
+        log.debug("Virtual NF, skipped: %s" % nf.id)
 
     #self.install_flowrules(nffg_part)
 
