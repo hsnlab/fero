@@ -177,16 +177,17 @@ class DataplaneDomainManager(AbstractDomainManager):
 
         log.debug("Starting new NF with parameters: %s" % params)
 
+        """
         self.deployed_vnfs[act_nf[0]]="aaaaa"
 
         """
+
         result = self.remoteAdapter.start(**params)
 
         if result is not None:
           self.deployed_vnfs[nf.id.split('-')[0]] = result
-        """
 
-      if nf.resources.cpu > 0:
+      if nf.id not in (nf.id for nf in un_topo.nfs) and nf.resources.cpu > 0:
         # Add initiated NF to topo description if not virtual NF
         log.info("Update Infrastructure layer topology description...")
         deployed_nf = nf.copy()
@@ -212,7 +213,7 @@ class DataplaneDomainManager(AbstractDomainManager):
       else:
         log.debug("Virtual NF, skipped: %s" % nf.id)
 
-    #self.install_flowrules(nffg_part)
+    self.install_flowrules(nffg_part)
 
     print self.topoAdapter.get_topology_resource().dump()
     return True
@@ -226,7 +227,7 @@ class DataplaneDomainManager(AbstractDomainManager):
 
     for link in nffg.sg_hops:
 
-      if len(link.id.split('-')) > 1:
+      if not isinstance(link.id, int):
         continue
 
       vlan_match=None
@@ -241,7 +242,7 @@ class DataplaneDomainManager(AbstractDomainManager):
         dst = link.dst.node.id.split('-')[0]
         vlan_tag=link.id
         if len(link.dst.node.id.split('-')) > 1:
-          vlan_tag="1"
+          vlan_tag=vlan_tag-1
       else:
         dst = link.dst.node.id + str(link.dst.id)
 
