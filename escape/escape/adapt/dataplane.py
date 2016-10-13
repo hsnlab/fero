@@ -107,7 +107,109 @@ class DataplaneDomainManager(AbstractDomainManager):
   # def controller_name (self):
   #   return self.controlAdapter.task_name
 
+
   def install_nffg (self, nffg_part):
+    """
+    Install an :any:`NFFG` related to the internal domain.
+
+    :param nffg_part: NF-FG need to be deployed
+    :type nffg_part: :any:`NFFG`
+    :return: installation was success or not
+    :rtype: bool
+    """
+    log.info(">>> Install %s domain part..." % self.domain_name)
+    try:
+      # Remove unnecessary and moved NFs first
+      result = [
+        self._delete_running_nfs(nffg=nffg_part),
+        # then (re)initiate mapped NFs
+        self._deploy_new_nfs(nffg_part)
+      ]
+      log.info("Perform traffic steering according to mapped tunnels/labels...")
+      result.append(self._deploy_flowrules(nffg_part))
+
+      return all(result)
+    except:
+      log.exception("Got exception during NFFG installation into: %s." %
+                    self.domain_name)
+      return False
+
+
+  def _delete_running_nfs (self, nffg=None):
+    """
+    Stop and delete deployed NFs which are not existed the new mapped request.
+
+    Detect if an NF was moved during the previous mapping and
+    remove that gracefully.
+
+    If the ``nffg`` parameter is not given, skip the NF migration detection
+    and remove all non-existent NF by default.
+
+    :param nffg: the last mapped NFFG part
+    :type nffg: :any:`NFFG`
+    :return: deletion was successful or not
+    :rtype: bool
+    """
+    result = True
+    topo = self.topoAdapter.get_topology_resource()
+    if topo is None:
+      log.warning("Missing topology description from %s domain! "
+                  "Skip deleting NFs..." % self.domain_name)
+      return False
+    log.debug("Check for removable NFs...")
+    # Skip non-execution environments
+    infras = [i.id for i in topo.infras if
+              i.infra_type in (NFFG.TYPE_INFRA_EE, NFFG.TYPE_INFRA_STATIC_EE)]
+    for infra_id in infras:
+      # Generate list of mapped NF on the infra previously
+      old_running_nfs = [n.id for n in topo.running_nfs(infra_id)]
+      # Detect non-moved NF if new mapping was given and skip deletion
+      for nf_id in old_running_nfs:
+        # If NF exist in the new mapping
+        if nffg is not None and nf_id in nffg:
+          new_running_nfs = [n.id for n in nffg.running_nfs(infra_id)]
+          # And connected to the same infra
+          if nf_id in new_running_nfs:
+            # NF was not moved, Skip deletion
+            log.debug('Unchanged NF: %s' % nf_id)
+            continue
+          # If the NF exists in the new mapping, but moved to another infra
+          else:
+            log.info("Found moved NF: %s")
+            log.debug("NF migration is not supported! Stop and remove already "
+                      "deployed NF and reinitialize later...")
+        else:
+          log.debug("Found removable NF: %s" % nf_id)
+
+        log.debug("Stop deployed NF: %s" % nf_id)
+        try:
+          vnf_id = nf_id.split('-')[0]
+          cid=self.deployed_vnfs[vnf_id]['cid']
+          # Stop running container
+          self.remoteAdapter.stop(cid)
+          # Remove NF from deployed cache
+          del self.deployed_vnfs[vnf_id]
+          # Get the other sub NFs
+          nf_parts=[nfpart for nfpart in topo.nfs if nfpart.id.startswith(vnf_id)]
+          for part in nf_parts:
+            # Delete infra ports connected to the deletable NF part
+            for u, v, link in topo.network.out_edges([part.id], data=True):
+              # Delete OVS port
+              self.remoteAdapter.delport(link.dst.id)
+              topo[v].del_port(id=link.dst.id)
+            # Delete NF
+            topo.del_node(part.id)
+        except KeyError:
+          log.error("Deployed VNF data for NF: %s is not found! "
+                    "Skip deletion..." % nf_id)
+          result = False
+          continue
+
+    log.debug("NF deletion result: %s" % ("SUCCESS" if result else "FAILURE"))
+    return result
+
+
+  def _deploy_new_nfs(self, nffg_part):
     """
     Install an :any:`NFFG` related to the dataplane domain.
 
@@ -122,6 +224,10 @@ class DataplaneDomainManager(AbstractDomainManager):
     
     nffg_part.clear_links(NFFG.TYPE_LINK_REQUIREMENT)
     un_topo = self.topoAdapter.get_topology_resource()
+
+    if un_topo is None:
+      log.warning("Missing topology description from %s domain! "
+                  "Skip deploying NFs..." % self.domain_name)
 
     # Remove special characters from infra side NF port id
     for nf in nffg_part.nfs:
@@ -213,15 +319,18 @@ class DataplaneDomainManager(AbstractDomainManager):
       else:
         log.debug("Virtual NF, skipped: %s" % nf.id)
 
-    self.install_flowrules(nffg_part)
-
     print self.topoAdapter.get_topology_resource().dump()
     return True
 
 
-  def install_flowrules (self, nffg):
+  def _deploy_flowrules(self, nffg):
+
+    self.remoteAdapter.delflow()
     
     ports = self.remoteAdapter.ovsports()
+    if ports is None:
+      log.warning("Missing OVS port information")
+      return False
 
     # Add flow rules based on sg hops in the actual request
 
@@ -258,7 +367,13 @@ class DataplaneDomainManager(AbstractDomainManager):
       if vlan_tag is not None:
         flowrule['actions']['push_vlan'] = str(vlan_tag)
 
-      self.remoteAdapter.addflow(**flowrule)
+      try:
+        self.remoteAdapter.addflow(**flowrule)
+      except:
+        log.error("Error occured during flowrule installation")
+        return False
+
+    return True
 
 
   def clear_domain (self):
