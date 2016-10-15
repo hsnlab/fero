@@ -79,11 +79,13 @@ class ResourceOrchestrator(AbstractOrchestrator):
         in_nf = nf.copy()
         in_nf.ports.clear()
         in_nf.resources.cpu=0
+        in_nf.resources.mem=0
         in_nf.id=nf.id + "-in"
         nffg.add_nf(nf=in_nf)
         out_nf = nf.copy()
         out_nf.ports.clear()
         out_nf.resources.cpu=0
+        out_nf.resources.mem=0
         out_nf.id=nf.id + "-out"
         nffg.add_nf(nf=out_nf)
 
@@ -110,6 +112,7 @@ class ResourceOrchestrator(AbstractOrchestrator):
           new_nf=nf.copy()
           new_nf.ports.clear()
           new_nf.resources.cpu=1.0
+          new_nf.resources.mem=nf.resources.mem / nf.resources.cpu
           new_nf.id=nf.id + "-core" + str(i)
           nffg.add_nf(nf=new_nf)
           new_port1=new_nf.add_port()
@@ -143,9 +146,6 @@ class ResourceOrchestrator(AbstractOrchestrator):
     log.log(VERBOSE, "Orchestration Layer request graph:\n%s" % nffg.dump())
     # Start Orchestrator layer mapping
     print nffg.dump()
-    self.preprocess_nffg(nffg)
-    print nffg.dump()
-
     if global_view is not None:
       if isinstance(global_view, AbstractVirtualizer):
         # If the request is a bare NFFG, it is probably an empty topo for domain
@@ -172,6 +172,8 @@ class ResourceOrchestrator(AbstractOrchestrator):
           log.info("Request check: detected valid content!")
         try:
           # Run Nf-FG mapping orchestration
+          log.debug("Starting request preprocession...")
+          self.preprocess_nffg(nffg)
           mapped_nffg = self.mapper.orchestrate(nffg, global_view)
           log.debug("NF-FG instantiation is finished by %s" %
                     self.__class__.__name__)

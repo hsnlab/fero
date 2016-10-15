@@ -240,6 +240,7 @@ class DataplaneDomainManager(AbstractDomainManager):
       act_nf=nf.id.split('-')
       ports=[]
       cores=[]
+      mem=0
 
       if len(act_nf) == 1:
 
@@ -254,6 +255,8 @@ class DataplaneDomainManager(AbstractDomainManager):
         cores = [link.dst.node.id for u, v, link in
                    nffg_part.real_out_edges_iter(nf.id)]
 
+        mem = nf.resources.mem       
+
 
       elif act_nf[0] not in self.deployed_vnfs:
 
@@ -264,6 +267,7 @@ class DataplaneDomainManager(AbstractDomainManager):
         log.debug("NF parts detected: %s" % [part.id for part in nf_parts])
 
         for n in nf_parts:
+          mem=mem + n.resources.mem
           if n.id.split('-')[1].startswith("core"):
             for u, v, link in nffg_part.real_out_edges_iter(n.id):
               cores.append(link.dst.node.id)
@@ -277,7 +281,8 @@ class DataplaneDomainManager(AbstractDomainManager):
       params = {'nf_type': nf.functional_type,
                 'nf_id': act_nf[0],
                 'nf_ports': [port for port in ports],
-                'infra_id': [core for core in cores]}
+                'infra_id': [core for core in cores],
+                'mem' : mem}
 
       if len(params['infra_id']) > 0:
 
@@ -381,6 +386,7 @@ class DataplaneDomainManager(AbstractDomainManager):
     :return: cleanup result
     :rtype: bool
     """
+    log.debug("Cleaning up %s domain..." % self.domain_name)
     topo = self.topoAdapter.get_topology_resource()
     if topo is None:
       log.warning("Missing topology description from %s domain! "
@@ -391,6 +397,7 @@ class DataplaneDomainManager(AbstractDomainManager):
       for port in self.deployed_vnfs[nf_id]['ovs_ports']:
         self.remoteAdapter.delport(port)
 
+      # Collecting other parts of the actual NF
       nf_parts=[nf for nf in topo.nfs if nf.id.startswith(nf_id)]
 
       for nf in nf_parts:
@@ -407,27 +414,7 @@ class DataplaneDomainManager(AbstractDomainManager):
     # Infrastructure layer has been cleared.
     log.debug("%s domain has been cleared!" % self.domain_name)
     return True
-      
-    """
-    for infra in topo.infras:
-      running_nfs = [n.id for n in topo.running_nfs(infra.id)]
-      for nf_id in running_nfs:
-          # Delete ports
-          for u, v, link in topo.network.out_edges([nf_id], data=True):
-            port=link.dst.id
-            self.remoteAdapter.delport(port)
-            topo[v].del_port(id=port)
-          # Delete NF
-          self.remoteAdapter.stop(self.deployed_vnfs[nf_id]['cid'])
-          topo.del_node(nf_id)
-
-    # Delete all flow rules
-    self.remoteAdapter.delflow()
-    # Infrastructure layer has been cleared.
-    log.debug("%s domain has been cleared!" % self.domain_name)
-    return True
-    """
-
+    
 
 class DataplaneTopologyAdapter(AbstractESCAPEAdapter):
   """
@@ -667,7 +654,7 @@ class DataplaneRESTAdapter(AbstractRESTAdapter, AbstractESCAPEAdapter,
                       " Ignore exception..." % self.CONNECTION_TIMEOUT)
 
   def addflow (self, match, actions, **kwargs):
-    logging.debug("Prepare start request for remote agent at: %s" %
+    logging.debug("Prepare install flowrule request for remote agent at: %s" %
                   self._base_url)
     try:
       data = {'match': match, 'actions': actions}
@@ -683,7 +670,7 @@ class DataplaneRESTAdapter(AbstractRESTAdapter, AbstractESCAPEAdapter,
                       " Ignore exception..." % self.CONNECTION_TIMEOUT)
 
   def stop (self, containerID):
-    log.debug("Send running request to remote agent: %s" % self._base_url)
+    log.debug("Send stop container request to remote agent: %s" % self._base_url)
     response = self.send_no_error(self.GET, 'stop/' + containerID)
     if response:
       log.debug("Stopped Docker container from remote %s domain "
@@ -694,7 +681,7 @@ class DataplaneRESTAdapter(AbstractRESTAdapter, AbstractESCAPEAdapter,
       return False
 
   def delport (self, portname):
-    log.debug("Send delport request to remote agent: %s" % self._base_url)
+    log.debug("Send delete ports request to remote agent: %s" % self._base_url)
     response = self.send_no_error(self.GET, 'delport/' + portname)
     if response:
       log.debug("Port deleted from remote %s domain "
@@ -705,7 +692,7 @@ class DataplaneRESTAdapter(AbstractRESTAdapter, AbstractESCAPEAdapter,
       return False
 
   def delflow (self):
-    log.debug("Send running request to remote agent: %s" % self._base_url)
+    log.debug("Send delete all flows request to remote agent: %s" % self._base_url)
     response = self.send_no_error(self.GET, 'delflow')
     if response:
       log.debug("Flow deleted from remote %s domain "
