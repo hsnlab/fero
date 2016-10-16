@@ -187,6 +187,9 @@ class DataplaneDomainManager(AbstractDomainManager):
           cid=self.deployed_vnfs[vnf_id]['cid']
           # Stop running container
           self.remoteAdapter.stop(cid)
+          # Remove OVS ports
+          for port in self.deployed_vnfs[vnf_id]['ovs_ports']:
+            self.remoteAdapter.delport(port)
           # Remove NF from deployed cache
           del self.deployed_vnfs[vnf_id]
           # Get the other sub NFs
@@ -194,8 +197,6 @@ class DataplaneDomainManager(AbstractDomainManager):
           for part in nf_parts:
             # Delete infra ports connected to the deletable NF part
             for u, v, link in topo.network.out_edges([part.id], data=True):
-              # Delete OVS port
-              self.remoteAdapter.delport(link.dst.id)
               topo[v].del_port(id=link.dst.id)
             # Delete NF
             topo.del_node(part.id)

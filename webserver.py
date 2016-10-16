@@ -9,8 +9,8 @@ app = Flask(__name__)
 if len(sys.argv) > 1:
   OVS_DIR = sys.argv[1]
 else:
-  OVS_DIR = "/home/sdn-tmit/src/marci/ovs/utilities/"
-  #OVS_DIR = "/home/cart/Documents/dpdktest/ovs/utilities/"
+  #OVS_DIR = "/home/sdn-tmit/src/marci/ovs/utilities/"
+  OVS_DIR = "/home/cart/Documents/dpdktest/ovs/utilities/"
 DPDK_DIR = "/home/sdn-tmit/src/marci/dpdk-patched"
 DBR = "dpdk_br"
 SERVER = '192.168.56.103'
@@ -95,7 +95,7 @@ def api_start ():
   params=[]
 
   if nftype == "trafficGenerator":
-    params += ["sudo", "docker", "run", "-t", "-d", "--cap-add", "SYS_ADMIN"]
+    params += ["sudo", "docker", "run", "-it", "-d", "--cap-add", "SYS_ADMIN"]
   else:
     params += ["sudo", "docker", "run", "-t", "-d", "--cap-add", "SYS_ADMIN"]
 
@@ -121,12 +121,12 @@ def api_start ():
     x += 1
 
   if nftype == "simpleForwarder": 
-    params += ["-v", "/dev/hugepages:/dev/hugepages","dpdk-l2fwd",
+    params += ["-v", "/dev/hugepages:/dev/hugepages","dpdk-test",
                  "./examples/l2fwd/build/l2fwd", "-c", hexcore ,
-                 "-n", "4", "-m", str(mem) , "--no-pci", "--file-prefix", nf]				 
+                 "-n", "4", "-m", str(mem) , "--no-pci", "--single-file", "--file-prefix", nf]				 
     x=0
     for port in ports:
-      params += ["--vdev=virtio_user" + str(x) + ",path=/var/run/usvhost" + str(x)]
+      params += ["--vdev=eth_cvio" + str(x) + ",path=/var/run/usvhost" + str(x)]
       x += 1
 
     # DPDK core mask	  
