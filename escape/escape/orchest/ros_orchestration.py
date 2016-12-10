@@ -81,32 +81,79 @@ class ResourceOrchestrator(AbstractOrchestrator):
         in_nf.resources.cpu=0
         in_nf.resources.mem=0
         in_nf.id=nf.id + "-in"
+        in_nf.functional_type="vhost"
         nffg.add_nf(nf=in_nf)
         out_nf = nf.copy()
         out_nf.ports.clear()
         out_nf.resources.cpu=0
         out_nf.resources.mem=0
+        out_nf.functional_type="vhost"
         out_nf.id=nf.id + "-out"
         nffg.add_nf(nf=out_nf)
+
+        in_tag=None
+        out_tag=None
+
+        dpdk_in=None
+        dpdk_out=None
 
         hops= [hop for hop in nffg.sg_hops]
         for hop in hops:
           if hop.dst.node.id == nf.id:
+            in_tag=hop.id
             in_port = nffg.network.node[in_nf.id].add_port(id=hop.dst.id)
-            old_hop=hop
+            old_hop=hop.copy()
             old_hop.dst=in_port
             nffg.del_edge(hop.src,hop.dst,hop.id)
-            nffg.add_sglink(hop.src,in_port,hop=old_hop)
+            if hop.src.node.id.startswith("dpdk"):
+              dpdk_nf = nf.copy()
+              dpdk_nf.ports.clear()
+              dpdk_nf.resources.cpu=0
+              dpdk_nf.resources.mem=0
+              dpdk_nf.id=hop.src.node.id.split('-')[0] + "-" + nf.id
+              dpdk_nf.functional_type=hop.src.node.id.split('-')[0]
+              nffg.add_nf(nf=dpdk_nf)
+              port1=dpdk_nf.add_port()
+              old_hop.src=port1
+              nffg.add_sglink(port1,in_port,hop=old_hop)
+              port2=dpdk_nf.add_port()
+              dpdk_in=nffg.add_sglink(hop.src,port2)
+            else:
+              nffg.add_sglink(hop.src,in_port,hop=old_hop)
 
           if hop.src.node.id == nf.id:
+            out_tag=hop.id
             out_port = nffg.network.node[out_nf.id].add_port(id=hop.src.id)
-            old_hop=hop
+            old_hop=hop.copy()
             old_hop.src=out_port
             nffg.del_edge(hop.src,hop.dst,hop.id)
-            nffg.add_sglink(out_port,hop.dst,hop=old_hop)
+            if hop.dst.node.id.startswith("dpdk"):
+              dpdk_nf = nf.copy()
+              dpdk_nf.ports.clear()
+              dpdk_nf.resources.cpu=0
+              dpdk_nf.resources.mem=0
+              dpdk_nf.id=hop.dst.node.id.split('-')[0] + "-" + nf.id
+              dpdk_nf.functional_type=hop.dst.node.id.split('-')[0]
+              nffg.add_nf(nf=dpdk_nf)
+              port1=dpdk_nf.add_port()
+              old_hop.dst=port1
+              nffg.add_sglink(out_port,port1,hop=old_hop)
+              port2=dpdk_nf.add_port()
+              dpdk_out=nffg.add_sglink(port2,hop.dst)
+            else:
+              nffg.add_sglink(out_port,hop.dst,hop=old_hop)
 
         vport_in=in_nf.add_port()
         vport_out=out_nf.add_port()
+
+        aff_reqs=[]
+        prev=None
+
+        for req in nffg.reqs: 
+          for elem in req.sg_path:
+            if prev == in_tag and elem == out_tag:
+              aff_reqs.append(req)
+            prev=elem
 
         for i in range(int(nf.resources.cpu)):
           new_nf=nf.copy()
@@ -116,12 +163,26 @@ class ResourceOrchestrator(AbstractOrchestrator):
           new_nf.id=nf.id + "-core" + str(i)
           nffg.add_nf(nf=new_nf)
           new_port1=new_nf.add_port()
-          nffg.add_sglink(vport_in,new_port1) 
+          sg1=nffg.add_sglink(vport_in,new_port1) 
           new_port2=new_nf.add_port()
-          nffg.add_sglink(new_port2,vport_out)         
-
+          sg2=nffg.add_sglink(new_port2,vport_out)
+          for req in aff_reqs:
+            new_req=req.copy()
+            new_req.regenerate_id()
+            poz=new_req.sg_path.index(in_tag)
+            new_req.sg_path.insert(poz+1, sg1.id)
+            new_req.sg_path.insert(poz+2, sg2.id) 
+            if dpdk_in is not None:
+              new_req.sg_path.insert(0, dpdk_in.id)
+            if dpdk_out is not None:
+              new_req.sg_path.insert(len(new_req.sg_path), dpdk_out.id) 
+            nffg.add_req(req.src,req.dst,req=new_req)          
+                    
         nffg.del_node(nf.id)
+        for req in aff_reqs:
+          nffg.del_edge(req.src,req.dst,req.id)
 
+    print nffg.dump()
     return nffg
 
   def instantiate_nffg (self, nffg):
