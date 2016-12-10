@@ -118,6 +118,9 @@ class DataplaneDomainManager(AbstractDomainManager):
     :rtype: bool
     """
     log.info(">>> Install %s domain part..." % self.domain_name)
+
+    print nffg_part.dump()
+    """
     try:
       # Remove unnecessary and moved NFs first
       result = [
@@ -133,6 +136,8 @@ class DataplaneDomainManager(AbstractDomainManager):
       log.exception("Got exception during NFFG installation into: %s." %
                     self.domain_name)
       return False
+     """
+    return True
 
 
   def _delete_running_nfs (self, nffg=None):
@@ -221,8 +226,7 @@ class DataplaneDomainManager(AbstractDomainManager):
     """
     log.info(">>> Install %s domain part..." % self.domain_name)
 
-    print nffg_part.dump()
-    
+      
     nffg_part.clear_links(NFFG.TYPE_LINK_REQUIREMENT)
     un_topo = self.topoAdapter.get_topology_resource()
 
@@ -497,7 +501,7 @@ class DataplaneTopologyAdapter(AbstractESCAPEAdapter):
     topo.duplicate_static_links()
     # Rewrite infra domains
     self.cache = self.rewrite_domain(nffg=topo)
-    # print self.cache.dump()
+    print self.cache.dump()
     return self.cache
 
   def setup_topology(self, nffg):
@@ -511,6 +515,16 @@ class DataplaneTopologyAdapter(AbstractESCAPEAdapter):
       
     saps= [sap.id for sap in nffg.saps]
 
+    dpdk_saps= [sap.id for sap in nffg.saps if sap.id.startswith("dpdk")]
+
+    dpdk_pmd=None
+    dpdk_core=None
+
+    if len(params["ovs_pus"]) > len(dpdk_saps):
+      dpdk_pmd=params["ovs_pus"][len(params["ovs_pus"])-len(dpdk_saps):]
+    else:
+      dpdk_core=params["ovs_pus"]
+
     for infra in nffg.infras:
 
       connected_saps = [link for u, v, link in nffg.real_out_edges_iter(infra.id)
@@ -518,7 +532,13 @@ class DataplaneTopologyAdapter(AbstractESCAPEAdapter):
 
       for link in connected_saps:
         if link.dst.node.id in params["inner_saps"]:
-          continue
+          old_id=link.dst.node.id
+          new_sap=link.dst.node
+          new_sap.id=link.dst.node.id + "-" + "inner"
+          new_sap.name=link.dst.node.name + "-" + "inner"
+          nffg.add_sap(sap_obj=new_sap)
+          nffg.del_node(old_id)
+          nffg.add_link(link.src,link.dst,link=link)
         else:
           old_id=link.dst.node.id
           new_sap=link.dst.node
@@ -532,7 +552,17 @@ class DataplaneTopologyAdapter(AbstractESCAPEAdapter):
         NFFG.TYPE_INFRA_EE, NFFG.TYPE_INFRA_STATIC_EE):
         continue
       elif infra.id in params["ovs_pus"]:
-        infra.supported=["ovs"]
+        if dpdk_pmd is not None:
+          if infra.id in dpdk_pmd:
+            infra.supported=["dpdk"+str(dpdk_pmd.index(infra.id))]
+            infra.supported.append("vhost")
+          else:
+            infra.supported=["ovs"]
+        else:
+          infra.supported=[]
+          for n in range(0,len(dpdk_saps)):
+            infra.supported.append("dpdk"+str(n))  
+          infra.supported.append("vhost")     
       else:
         infra.supported=[sup for sup in params["supported_vnfs"]]
     return nffg
