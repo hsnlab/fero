@@ -120,7 +120,7 @@ class DataplaneDomainManager(AbstractDomainManager):
     log.info(">>> Install %s domain part..." % self.domain_name)
 
     print nffg_part.dump()
-    """
+
     try:
       # Remove unnecessary and moved NFs first
       result = [
@@ -131,13 +131,12 @@ class DataplaneDomainManager(AbstractDomainManager):
       log.info("Perform traffic steering according to mapped tunnels/labels...")
       result.append(self._deploy_flowrules(nffg_part))
 
-      return all(result)
     except:
       log.exception("Got exception during NFFG installation into: %s." %
                     self.domain_name)
       return False
-     """
-    return True
+
+    return all(result)
 
 
   def _delete_running_nfs (self, nffg=None):
@@ -242,12 +241,20 @@ class DataplaneDomainManager(AbstractDomainManager):
       
     for nf in nffg_part.nfs:
 
+      if nf.id in [vnf.id for vnf in un_topo.nfs] or nf.resources.cpu == 0:
+        continue
+
       act_nf=nf.id.split('-')
+      log.debug("New sub NF detected for: %s" % act_nf[0])
+
       ports=[]
       cores=[]
       mem=0
 
-      if len(act_nf) == 1:
+      nf_parts=[nfpart for nfpart in nffg_part.nfs if nfpart.id.startswith(act_nf[0])]
+      log.debug("NF parts detected: %s" % [part.id for part in nf_parts])
+
+      if len(nf_parts) == 2:
 
         if nf.id in (nf.id for nf in un_topo.nfs):
           log.debug("NF: %s has already been initiated. Continue to next NF..."
@@ -262,14 +269,7 @@ class DataplaneDomainManager(AbstractDomainManager):
 
         mem = nf.resources.mem       
 
-
-      elif act_nf[0] not in self.deployed_vnfs:
-
-        log.debug("New sub NF detected for: %s" % act_nf[0])
-
-        nf_parts=[nfpart for nfpart in nffg_part.nfs if nfpart.id.startswith(act_nf[0])]
-
-        log.debug("NF parts detected: %s" % [part.id for part in nf_parts])
+      else:
 
         for n in nf_parts:
           mem=mem + n.resources.mem
@@ -293,27 +293,21 @@ class DataplaneDomainManager(AbstractDomainManager):
 
         log.debug("Starting new NF with parameters: %s" % params)
 
-        """
-        self.deployed_vnfs[act_nf[0]]="aaaaa"
-
-        """
-
         result = self.remoteAdapter.start(**params)
-
         if result is not None:
           self.deployed_vnfs[nf.id.split('-')[0]] = result
 
-      if nf.id not in (nf.id for nf in un_topo.nfs) and nf.resources.cpu > 0:
+      for part in nf_parts:
         # Add initiated NF to topo description if not virtual NF
         log.info("Update Infrastructure layer topology description...")
-        deployed_nf = nf.copy()
+        deployed_nf = part.copy()
         deployed_nf.ports.clear()
         un_topo.add_nf(nf=deployed_nf)
-        log.debug("Add deployed NF to topology: %s" % nf.id)
+        log.debug("Add deployed NF to topology: %s" % part.id)
         # Add Link between actual NF and INFRA
-        for nf_id, infra_id, link in nffg_part.real_out_edges_iter(nf.id):
+        for nf_id, infra_id, link in nffg_part.real_out_edges_iter(part.id):
           # Get Link's src ref to new NF's port
-          nf_port = deployed_nf.ports.append(nf.ports[link.src.id].copy())
+          nf_port = deployed_nf.ports.append(part.ports[link.src.id].copy())
           # Create INFRA side Port
           infra_port = un_topo.network.node[infra_id].add_port(
             id=link.dst.id)
@@ -327,7 +321,7 @@ class DataplaneDomainManager(AbstractDomainManager):
         log.debug("%s topology description is updated with NF: %s" % (
             self.domain_name, deployed_nf.name))
       else:
-        log.debug("Virtual NF, skipped: %s" % nf.id)
+        log.debug("NF skipped: %s" % nf.id)
 
     print self.topoAdapter.get_topology_resource().dump()
     return True
@@ -360,7 +354,7 @@ class DataplaneDomainManager(AbstractDomainManager):
       if link.dst.node.id.startswith("dpdk"):
         dst = link.dst.node.id.split('-')[0]
         vlan_tag=link.id
-        if len(link.dst.node.id.split('-')) > 1:
+        if not link.dst.node.id.endswith("inner"):
           vlan_tag=vlan_tag-1
       else:
         dst = link.dst.node.id + str(link.dst.id)
@@ -520,7 +514,7 @@ class DataplaneTopologyAdapter(AbstractESCAPEAdapter):
     dpdk_pmd=None
     dpdk_core=None
 
-    if len(params["ovs_pus"]) > len(dpdk_saps):
+    if len(params["ovs_pus"]) >= len(dpdk_saps):
       dpdk_pmd=params["ovs_pus"][len(params["ovs_pus"])-len(dpdk_saps):]
     else:
       dpdk_core=params["ovs_pus"]
