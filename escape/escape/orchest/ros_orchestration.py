@@ -73,6 +73,33 @@ class ResourceOrchestrator(AbstractOrchestrator):
         nffg.add_sglink(v[0], v[1], flowclass=v[2], bandwidth=v[3], delay=v[4],
                            id=k[2])
 
+    hops= [hop for hop in nffg.sg_hops]
+    for hop in hops:
+      if hop.src.node.id.startswith("dpdk") and hop.dst.node.id.startswith("dpdk"):
+        dpdk_in=nffg.add_nf(id=hop.src.node.id.split('-')[0] + "-in" + str(hop.id))
+        dpdk_in.resources.cpu=0
+        dpdk_in.resources.mem=0
+        dpdk_in.resources.storage=0
+        dpdk_in.functional_type=hop.src.node.id.split('-')[0]
+        dpdk_out=nffg.add_nf(id=hop.dst.node.id.split('-')[0] + "-out" + str(hop.id))
+        dpdk_out.resources.cpu=0
+        dpdk_out.resources.mem=0
+        dpdk_out.resources.storage=0
+        dpdk_out.functional_type=hop.dst.node.id.split('-')[0]
+        link_in=nffg.add_sglink(hop.src,dpdk_in.add_port())
+        link_out=nffg.add_sglink(dpdk_out.add_port(), hop.dst)
+        link=hop.copy()
+        link.src=dpdk_in.add_port()
+        link.dst=dpdk_out.add_port()
+        nffg.del_edge(hop.src,hop.dst,hop.id)
+        nffg.add_sglink(link.src,link.dst,hop=link)
+
+        for req in nffg.reqs: 
+          if hop.id in req.sg_path:
+            req.sg_path.insert(0,link_in.id)
+            req.sg_path.insert(len(req.sg_path),link_out.id)
+
+        
     nfs = [nf for nf in nffg.nfs]
     for nf in nfs:
       if nf.resources.cpu > 1:
