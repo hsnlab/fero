@@ -137,7 +137,8 @@ class DataplaneDomainManager(AbstractDomainManager):
       return False
 
     return all(result)
-
+ 
+    return True
 
   def _delete_running_nfs (self, nffg=None):
     """
@@ -241,7 +242,7 @@ class DataplaneDomainManager(AbstractDomainManager):
       
     for nf in nffg_part.nfs:
 
-      if nf.id in [vnf.id for vnf in un_topo.nfs] or nf.resources.cpu == 0:
+      if nf.id in [vnf.id for vnf in un_topo.nfs] or nf.id.startswith("dpdk") or nf.functional_type == "vhost":
         continue
 
       act_nf=nf.id.split('-')
@@ -251,37 +252,23 @@ class DataplaneDomainManager(AbstractDomainManager):
       cores=[]
       mem=0
 
+      # Get each part of actual NF
       nf_parts=[nfpart for nfpart in nffg_part.nfs if nfpart.id.startswith(act_nf[0])]
       log.debug("NF parts detected: %s" % [part.id for part in nf_parts])
 
-      if len(nf_parts) == 2:
-
-        if nf.id in (nf.id for nf in un_topo.nfs):
-          log.debug("NF: %s has already been initiated. Continue to next NF..."
-                    % nf.short_name)
-          continue
-
-        ports = [link.dst.id for u, v, link in
-                   nffg_part.real_out_edges_iter(nf.id)]
-
-        cores = [link.dst.node.id for u, v, link in
-                   nffg_part.real_out_edges_iter(nf.id)]
-
-        mem = nf.resources.mem       
-
-      else:
-
-        for n in nf_parts:
-          mem=mem + n.resources.mem
-          if n.id.split('-')[1].startswith("core"):
-            for u, v, link in nffg_part.real_out_edges_iter(n.id):
-              cores.append(link.dst.node.id)
-              break
-          else:
-            for u, v, link in nffg_part.real_out_edges_iter(n.id):
-              if len(link.dst.id.split('-')) < 3:
-                ports.append(link.dst.id)
-                break                        
+      for n in nf_parts:
+        mem=mem + n.resources.mem
+        if n.id.split('-')[1].startswith("core"):
+          for u, v, link in nffg_part.real_out_edges_iter(n.id):
+            cores.append(link.dst.node.id)
+            break
+        else:
+          for u, v, link in nffg_part.real_out_edges_iter(n.id):
+            if len(link.dst.id.split('-')) < 3:
+              conf={'port_id': link.dst.id,
+                    'core': link.dst.node.id }
+              ports.append(conf)
+              break                        
 
       params = {'nf_type': nf.functional_type,
                 'nf_id': act_nf[0],
@@ -392,6 +379,9 @@ class DataplaneDomainManager(AbstractDomainManager):
                   "Skip deleting NFs..." % self.domain_name)
       return False
 
+    # Delete all flow rules
+    self.remoteAdapter.delflow()
+
     for nf_id in self.deployed_vnfs:
       for port in self.deployed_vnfs[nf_id]['ovs_ports']:
         self.remoteAdapter.delport(port)
@@ -408,8 +398,6 @@ class DataplaneDomainManager(AbstractDomainManager):
       self.remoteAdapter.stop(self.deployed_vnfs[nf_id]['cid'])
       topo.del_node(nf_id)
 
-    # Delete all flow rules
-    self.remoteAdapter.delflow()
     # Infrastructure layer has been cleared.
     log.debug("%s domain has been cleared!" % self.domain_name)
     return True
@@ -497,69 +485,6 @@ class DataplaneTopologyAdapter(AbstractESCAPEAdapter):
     self.cache = self.rewrite_domain(nffg=topo)
     print self.cache.dump()
     return self.cache
-
-  def setup_topology(self, nffg):
-    """
-    Modify the hwloc topology according to the config file.
-
-    :return: the modified topology description
-    :rtype: :any:`NFFG`
-    """   
-    params=CONFIG.get_un_params()
-      
-    saps= [sap.id for sap in nffg.saps]
-
-    dpdk_saps= [sap.id for sap in nffg.saps if sap.id.startswith("dpdk")]
-
-    dpdk_pmd=None
-    dpdk_core=None
-
-    if len(params["ovs_pus"]) >= len(dpdk_saps):
-      dpdk_pmd=params["ovs_pus"][len(params["ovs_pus"])-len(dpdk_saps):]
-    else:
-      dpdk_core=params["ovs_pus"]
-
-    for infra in nffg.infras:
-
-      connected_saps = [link for u, v, link in nffg.real_out_edges_iter(infra.id)
-                        if link.dst.node.id in saps]
-
-      for link in connected_saps:
-        if link.dst.node.id in params["inner_saps"]:
-          old_id=link.dst.node.id
-          new_sap=link.dst.node
-          new_sap.id=link.dst.node.id + "-" + "inner"
-          new_sap.name=link.dst.node.name + "-" + "inner"
-          nffg.add_sap(sap_obj=new_sap)
-          nffg.del_node(old_id)
-          nffg.add_link(link.src,link.dst,link=link)
-        else:
-          old_id=link.dst.node.id
-          new_sap=link.dst.node
-          new_sap.id=link.dst.node.id + "-" + params["domain"]
-          new_sap.name=link.dst.node.name + "-" + params["domain"]
-          nffg.add_sap(sap_obj=new_sap)
-          nffg.del_node(old_id)
-          nffg.add_link(link.src,link.dst,link=link)
-
-      if infra.infra_type not in (
-        NFFG.TYPE_INFRA_EE, NFFG.TYPE_INFRA_STATIC_EE):
-        continue
-      elif infra.id in params["ovs_pus"]:
-        if dpdk_pmd is not None:
-          if infra.id in dpdk_pmd:
-            infra.supported=["dpdk"+str(dpdk_pmd.index(infra.id))]
-            infra.supported.append("vhost")
-          else:
-            infra.supported=["ovs"]
-        else:
-          infra.supported=[]
-          for n in range(0,len(dpdk_saps)):
-            infra.supported.append("dpdk"+str(n))  
-          infra.supported.append("vhost")     
-      else:
-        infra.supported=[sup for sup in params["supported_vnfs"]]
-    return nffg
 
 class DefaultDataplaneDomainAPI(object):
   """

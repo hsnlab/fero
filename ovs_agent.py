@@ -90,7 +90,7 @@ def api_start ():
     mask = mask + pow(2,core)
   hexcore=hex(mask)
 
-  nf=data['nf_id'].encode() 
+  nf=data['nf_id'].encode()
   
   params=[]
 
@@ -104,11 +104,16 @@ def api_start ():
   
   x=0
   for port in ports:
-    ovs_port=port.encode()
+    ovs_port=port['port_id'].encode()
+    ovs_core=port['core'].encode().split('#')[1]  
     #Add port to the OVS bridge.
     subprocess.call(["sudo", OVS_DIR + "ovs-vsctl", "add-port", DBR,		
                      ovs_port , "--", "set", "Interface",ovs_port ,
                      "type=dpdkvhostuser"])
+
+    #Set rxq affinity.
+    subprocess.call(["sudo", OVS_DIR + "ovs-vsctl", "set", "Interface",		
+                     ovs_port , "other_config:pmd-rxq-affinity=0:" + ovs_core])
 
     #Get openflow portnum of the newly created port.
     portnum=subprocess.check_output(["sudo", OVS_DIR + "ovs-vsctl" ,
@@ -151,7 +156,7 @@ def api_start ():
       x += 1
 
     # DPDK core mask
-    params += ["--", "-P", "-m", pktgen_param, "-f", "./testconfig.lua"] 
+    params += ["--", "-P", "-m", pktgen_param] 
         
   # Get newly initiated container ID
   proc=subprocess.Popen(params, stdout=subprocess.PIPE) 	

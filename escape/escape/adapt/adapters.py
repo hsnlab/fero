@@ -358,6 +358,7 @@ class StaticFileTopoAdapter(AbstractESCAPEAdapter):
       with open(path, 'r') as f:
         log.debug("Load topology from file: %s" % path)
         self.topo = self.rewrite_domain(NFFG.parse(f.read()))
+        self.setup_topology(self.topo)
         self.topo.duplicate_static_links()
         # print self.topo.dump()
     except IOError:

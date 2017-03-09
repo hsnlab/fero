@@ -20,7 +20,7 @@ from requests import Session, ConnectionError, HTTPError, Timeout, \
   RequestException
 
 import pox.openflow.libopenflow_01 as of
-from escape import __version__
+from escape import CONFIG, __version__
 from escape.adapt import log
 from escape.nffg_lib.nffg import NFFG
 from escape.util.config import ConfigurationError
@@ -601,6 +601,58 @@ class AbstractESCAPEAdapter(EventMixin):
     tmp = self.__dirty
     self.__dirty = False
     return tmp
+
+  def setup_topology(self, nffg):
+    """
+    Modify the hwloc topology according to the config file.
+
+    :return: the modified topology description
+    :rtype: :any:`NFFG`
+    """   
+    params=CONFIG.get_un_params()
+      
+    saps= [sap.id for sap in nffg.saps]
+
+    dpdk_saps= [sap.id for sap in nffg.saps if sap.id.startswith("dpdk")]
+
+    dpdk_lcore=params["ovs_pus"].keys()[0]
+
+    for infra in nffg.infras:
+
+      connected_saps = [link for u, v, link in nffg.real_out_edges_iter(infra.id)
+                        if link.dst.node.id in saps]
+
+      for link in connected_saps:
+        if link.dst.node.id in params["inner_saps"]:
+          old_id=link.dst.node.id
+          new_sap=link.dst.node
+          new_sap.id=link.dst.node.id + "-" + "inner"
+          new_sap.name=link.dst.node.name + "-" + "inner"
+          nffg.add_sap(sap_obj=new_sap)
+          nffg.del_node(old_id)
+          nffg.add_link(link.src,link.dst,link=link)
+        else:
+          old_id=link.dst.node.id
+          new_sap=link.dst.node
+          new_sap.id=link.dst.node.id + "-" + params["domain"]
+          new_sap.name=link.dst.node.name + "-" + params["domain"]
+          nffg.add_sap(sap_obj=new_sap)
+          nffg.del_node(old_id)
+          nffg.add_link(link.src,link.dst,link=link)
+
+      if infra.infra_type not in (
+        NFFG.TYPE_INFRA_EE, NFFG.TYPE_INFRA_STATIC_EE):
+        continue
+      elif infra.id in params["ovs_pus"]:
+        if infra.id == dpdk_lcore:
+          infra.supported=["ovs"]
+        else:
+            infra.supported=list(params["ovs_pus"][infra.id])
+            infra.supported.append("vhost")  
+      else:
+        infra.supported=list(params["supported_vnfs"])
+    return nffg
+
 
   def finit (self):
     """
