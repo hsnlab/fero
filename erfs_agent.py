@@ -30,7 +30,7 @@ portmap["dpdk0"]["core"]=1
 portmap["dpdk1"]={}
 portmap["dpdk1"]["erfs_port"]="KNI:2"
 portmap["dpdk1"]["of_port"]=2
-portmap["dpdk1"]["core"]=2
+portmap["dpdk1"]["core"]=1
 
 @app.errorhandler(500)
 def error_msg(error=None):
@@ -133,10 +133,10 @@ def api_start ():
       
     ovs_ports[ovs_port]=nextofport
 
-  #Set rxq affinity.
-  ret= set_rxq_aff_all()
-  if ret != True:
-    return error_msg("Error in setting rxq affinity")
+    #Set rxq affinity.
+    ret= add_lcore(ovs_port)
+    if ret != True:
+      return error_msg("Error in setting rxq affinity")
 					
   if nftype == "simpleForwarderVHOST":
     cid=start_simpleForwarder(ports, hexcore, mem, nf) 
@@ -181,10 +181,8 @@ def send_request(request):
     s.send(request + '\n')
     ans = s.recv(4096)
     s.close()
-    print ans
     return ans
   except socket.error:
-    print "ERROR"
     return "Error"
 
 def get_next_ofport():
@@ -220,6 +218,17 @@ def set_rxq_aff_all():
     if ret.rstrip() != "OK":
       return False
 
+  return True
+
+def add_lcore(port):
+  core=portmap[port]["core"]
+  comm= "lcore " + str(core)
+  for prt in portmap:
+    if portmap[prt]["core"] == core:
+      comm= comm + " " + portmap[prt]["erfs_port"]
+  ret=send_request(comm)
+  if ret.rstrip() != "OK":
+    return False
   return True
 
 def remove_lcore(port):

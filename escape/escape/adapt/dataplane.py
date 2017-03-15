@@ -122,10 +122,12 @@ class DataplaneDomainManager(AbstractDomainManager):
     print nffg_part.dump()
 
     try:
-      # Remove unnecessary and moved NFs first
       result = [
+        # Remove flowrules from infrastructure switch
+        self.remoteAdapter.delflow(),
+        # then remove unnecessary and moved NFs
         self._delete_running_nfs(nffg=nffg_part),
-        # then (re)initiate mapped NFs
+        # finally (re)initiate mapped NFs
         self._deploy_new_nfs(nffg_part)
       ]
       log.info("Perform traffic steering according to mapped tunnels/labels...")
@@ -137,8 +139,7 @@ class DataplaneDomainManager(AbstractDomainManager):
       return False
 
     return all(result)
- 
-    return True
+
 
   def _delete_running_nfs (self, nffg=None):
     """
@@ -316,8 +317,6 @@ class DataplaneDomainManager(AbstractDomainManager):
 
   def _deploy_flowrules(self, nffg):
 
-    self.remoteAdapter.delflow()
-    
     ports = self.remoteAdapter.ovsports()
     if ports is None:
       log.warning("Missing OVS port information")

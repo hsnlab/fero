@@ -648,7 +648,8 @@ class AbstractESCAPEAdapter(EventMixin):
           infra.supported=["ovs"]
         else:
             infra.supported=list(params["ovs_pus"][infra.id])
-            infra.supported.append("vhost")  
+            infra.supported.append("VHOST") 
+            infra.supported.append("KNI") 
       else:
         infra.supported=list(params["supported_vnfs"])
     return nffg

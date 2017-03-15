@@ -73,19 +73,22 @@ class ResourceOrchestrator(AbstractOrchestrator):
         nffg.add_sglink(v[0], v[1], flowclass=v[2], bandwidth=v[3], delay=v[4],
                            id=k[2])
 
+    for sap in nffg.saps:
+      if sap.id.startswith("dpdk"):
+        dpdk=sap.id.split('-')[0]
+        dpdk_nf=nffg.add_nf(id=dpdk)
+        dpdk_nf.resources.cpu=0
+        dpdk_nf.resources.mem=0
+        dpdk_nf.resources.storage=0
+        dpdk_nf.functional_type=dpdk
+
     hops= [hop for hop in nffg.sg_hops]
     for hop in hops:
       if hop.src.node.id.startswith("dpdk") and hop.dst.node.id.startswith("dpdk"):
-        dpdk_in=nffg.add_nf(id=hop.src.node.id.split('-')[0] + "-in" + str(hop.id))
-        dpdk_in.resources.cpu=0
-        dpdk_in.resources.mem=0
-        dpdk_in.resources.storage=0
-        dpdk_in.functional_type=hop.src.node.id.split('-')[0]
-        dpdk_out=nffg.add_nf(id=hop.dst.node.id.split('-')[0] + "-out" + str(hop.id))
-        dpdk_out.resources.cpu=0
-        dpdk_out.resources.mem=0
-        dpdk_out.resources.storage=0
-        dpdk_out.functional_type=hop.dst.node.id.split('-')[0]
+        dpdk_in_id=hop.src.node.id.split('-')[0]
+        dpdk_out_id=hop.dst.node.id.split('-')[0]
+        dpdk_in=nffg.network.node[dpdk_in_id]
+        dpdk_out=nffg.network.node[dpdk_out_id]
         link_in=nffg.add_sglink(hop.src,dpdk_in.add_port())
         link_out=nffg.add_sglink(dpdk_out.add_port(), hop.dst)
         link=hop.copy()
@@ -100,21 +103,27 @@ class ResourceOrchestrator(AbstractOrchestrator):
             req.sg_path.insert(len(req.sg_path),link_out.id)
 
         
-    nfs = [nf for nf in nffg.nfs]
+    nfs = [nf for nf in nffg.nfs if not nf.functional_type.startswith("dpdk")]
     for nf in nfs:
+
+      if nf.functional_type.endswith("KNI"):
+        NF_TYPE="KNI"
+      elif nf.functional_type.endswith("VHOST"): 
+        NF_TYPE="VHOST"
+
       if len(nf.ports) > 1:
         in_nf = nf.copy()
         in_nf.ports.clear()
         in_nf.resources.cpu=0
         in_nf.resources.mem=0
         in_nf.id=nf.id + "-in"
-        in_nf.functional_type="vhost"
+        in_nf.functional_type=NF_TYPE
         nffg.add_nf(nf=in_nf)
         out_nf = nf.copy()
         out_nf.ports.clear()
         out_nf.resources.cpu=0
         out_nf.resources.mem=0
-        out_nf.functional_type="vhost"
+        out_nf.functional_type=NF_TYPE
         out_nf.id=nf.id + "-out"
         nffg.add_nf(nf=out_nf)
       else:
@@ -123,7 +132,7 @@ class ResourceOrchestrator(AbstractOrchestrator):
         in_nf.resources.cpu=0
         in_nf.resources.mem=0
         in_nf.id=nf.id + "-inout"
-        in_nf.functional_type="vhost"
+        in_nf.functional_type=NF_TYPE
         nffg.add_nf(nf=in_nf)
         out_nf=in_nf
 
@@ -145,13 +154,8 @@ class ResourceOrchestrator(AbstractOrchestrator):
           old_hop.dst=in_port
           nffg.del_edge(hop.src,hop.dst,hop.id)
           if hop.src.node.id.startswith("dpdk"):
-            dpdk_nf = nf.copy()
-            dpdk_nf.ports.clear()
-            dpdk_nf.resources.cpu=0
-            dpdk_nf.resources.mem=0
-            dpdk_nf.id=hop.src.node.id.split('-')[0] + "-" + nf.id
-            dpdk_nf.functional_type=hop.src.node.id.split('-')[0]
-            nffg.add_nf(nf=dpdk_nf)
+            dpdk_nf_id=hop.src.node.id.split('-')[0]
+            dpdk_nf = nffg.network.node[dpdk_nf_id]
             port1=dpdk_nf.add_port()
             old_hop.src=port1
             nffg.add_sglink(port1,in_port,hop=old_hop)
@@ -170,13 +174,8 @@ class ResourceOrchestrator(AbstractOrchestrator):
           old_hop.src=out_port
           nffg.del_edge(hop.src,hop.dst,hop.id)
           if hop.dst.node.id.startswith("dpdk"):
-            dpdk_nf = nf.copy()
-            dpdk_nf.ports.clear()
-            dpdk_nf.resources.cpu=0
-            dpdk_nf.resources.mem=0
-            dpdk_nf.id=hop.dst.node.id.split('-')[0] + "-" + nf.id
-            dpdk_nf.functional_type=hop.dst.node.id.split('-')[0]
-            nffg.add_nf(nf=dpdk_nf)
+            dpdk_nf_id= hop.dst.node.id.split('-')[0]
+            dpdk_nf = nffg.network.node[dpdk_nf_id]
             port1=dpdk_nf.add_port()
             old_hop.dst=port1
             nffg.add_sglink(out_port,port1,hop=old_hop)
@@ -199,13 +198,15 @@ class ResourceOrchestrator(AbstractOrchestrator):
 
       cpu_req=int(nf.resources.cpu)
       if cpu_req==0:
-        cpu_req=1
+        num_cpu=1
+      else:
+        num_cpu=cpu_req
 
-      for i in range(cpu_req):
+      for i in range(num_cpu):
         new_nf=nf.copy()
         new_nf.ports.clear()
-        new_nf.resources.cpu=1.0
-        new_nf.resources.mem=nf.resources.mem / cpu_req
+        new_nf.resources.cpu=cpu_req / num_cpu
+        new_nf.resources.mem=nf.resources.mem / num_cpu
         new_nf.id=nf.id + "-core" + str(i)
         nffg.add_nf(nf=new_nf)
         new_port1=new_nf.add_port()
