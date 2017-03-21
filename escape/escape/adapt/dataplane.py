@@ -243,7 +243,8 @@ class DataplaneDomainManager(AbstractDomainManager):
       
     for nf in nffg_part.nfs:
 
-      if nf.id in [vnf.id for vnf in un_topo.nfs] or nf.id.startswith("dpdk") or nf.functional_type == "vhost":
+      if nf.id in [vnf.id for vnf in un_topo.nfs] or nf.id.startswith("dpdk") \
+        or nf.functional_type == "VHOST" or nf.functional_type == "KNI":
         continue
 
       act_nf=nf.id.split('-')

@@ -129,7 +129,7 @@ def api_start ():
     portmap[ovs_port]={}
     portmap[ovs_port]["erfs_port"]=pname
     portmap[ovs_port]["of_port"]=nextofport
-    portmap[ovs_port]["core"]=ovs_core
+    portmap[ovs_port]["core"]=int(ovs_core)
       
     ovs_ports[ovs_port]=nextofport
 
@@ -146,6 +146,9 @@ def api_start ():
 
   elif nftype == "generatorKNI":
     cid=start_generatorKNI(ports)
+
+  elif nftype == "forwarderKNI":
+    cid=start_forwarderKNI(ports)
 
   ret = {'cid': cid, 		  # ID of the new container
          'ovs_ports': ovs_ports}  # New ports with openflow IDs
@@ -248,13 +251,32 @@ def start_generatorKNI(nf_ports):
   params=["sudo" , "docker", "run",  "-itd", "--net='none'", "ubuntu:latest", "/bin/bash"]
   proc=subprocess.Popen(params, stdout=subprocess.PIPE) 
   cid=proc.stdout.readline().rstrip()
+  ret = subprocess.check_output(["sudo", "docker", "inspect", "-f", "{{.State.Pid}}", cid])
+  ret=ret.rstrip()
   for port in nf_ports:
     ovs_port=port['port_id'].encode()
     kni_port=portmap[ovs_port]["erfs_port"].replace(":","").lower()	
-    ret = subprocess.check_output(["sudo", "docker", "inspect", "-f", "{{.State.Pid}}", cid])
-    ret=ret.rstrip()
     subprocess.call(["sudo", "ln" ,"-s", "/proc/" + str(ret) + "/ns/net", "/var/run/netns/" + str(ret)])
     subprocess.call(["sudo", "ip" ,"link", "set", kni_port, "netns", str(ret)])
+    subprocess.call(["sudo", "ip" ,"netns", "exec", str(ret), "ifconfig", kni_port,
+                     "192.168.1." + str(portmap[ovs_port]["of_port"]) + "/24", "up"])    
+  return cid
+
+def start_forwarderKNI(nf_ports):
+  params=["sudo" , "docker", "run",  "-itd", "--net='none'", "ubuntu:latest", "/bin/bash"]
+  proc=subprocess.Popen(params, stdout=subprocess.PIPE) 
+  cid=proc.stdout.readline().rstrip()
+  ret = subprocess.check_output(["sudo", "docker", "inspect", "-f", "{{.State.Pid}}", cid])
+  ret=ret.rstrip()
+  subprocess.call(["sudo", "ln" ,"-s", "/proc/" + str(ret) + "/ns/net", "/var/run/netns/" + str(ret)])
+  subprocess.call(["sudo", "ip" ,"netns", "exec", str(ret), "brctl", "addbr", "mybridge"])
+  for port in nf_ports:
+    ovs_port=port['port_id'].encode()
+    kni_port=portmap[ovs_port]["erfs_port"].replace(":","").lower()	
+    subprocess.call(["sudo", "ip" ,"link", "set", kni_port, "netns", str(ret)])
+    subprocess.call(["sudo", "ip" ,"netns", "exec", str(ret), "ifconfig", kni_port, "promisc" , "up"])
+    subprocess.call(["sudo", "ip" ,"netns", "exec", str(ret), "brctl", "addif", "mybridge", kni_port])
+  subprocess.call(["sudo", "ip" ,"netns", "exec", str(ret), "ifconfig", "mybridge" , "up"])
   return cid
 
 def start_simpleForwarder(nf_ports, hexcore, mem, nf):
