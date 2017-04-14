@@ -1,0 +1,183 @@
+{
+   "edge_links" : [
+      {
+         "bandwidth" : "1001",
+         "delay" : 0.10,
+         "dst_node" : "PU#0",
+         "dst_port" : 0,
+         "id" : 2,
+         "src_node" : "Socket!0",
+         "src_port" : 3
+      },
+      {
+         "bandwidth" : "1001",
+         "delay" : 0.10,
+         "dst_node" : "PU#1",
+         "dst_port" : 1,
+         "id" : 4,
+         "src_node" : "Socket!0",
+         "src_port" : 5
+      },
+      {
+         "bandwidth" : "1000",
+         "delay" : 0.10,
+         "dst_node" : "eth0",
+         "dst_port" : 7,
+         "id" : 9,
+         "src_node" : "NRBUS",
+         "src_port" : 8
+      },
+      {
+         "bandwidth" : "1001",
+         "delay" : 0.10,
+         "dst_node" : "tunl0",
+         "dst_port" : 10,
+         "id" : 12,
+         "src_node" : "NRBUS",
+         "src_port" : 11
+      },
+      {
+         "bandwidth" : "1001",
+         "delay" : 0.10,
+         "dst_node" : "wlan0",
+         "dst_port" : 13,
+         "id" : 15,
+         "src_node" : "NRBUS",
+         "src_port" : 14
+      },
+      {
+         "bandwidth" : 1000,
+         "delay" : 0.10,
+         "dst_node" : "NRBUS",
+         "dst_port" : 16,
+         "id" : 17,
+         "src_node" : "Socket!0",
+         "src_port" : 6
+      }
+   ],
+   "node_infras" : [
+      {
+         "domain" : "INTERNAL",
+         "id" : "PU#0",
+         "name" : "PU#0",
+         "ports" : [
+            {
+               "id" : 0
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 1,
+            "delay" : 0.50,
+            "mem" : 32000,
+            "storage" : 150
+         },
+         "supported" : [ "headerDecompressor" ],
+         "type" : "EE"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "PU#1",
+         "name" : "PU#1",
+         "ports" : [
+            {
+               "id" : 1
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 1,
+            "delay" : 0.50,
+            "mem" : 32000,
+            "storage" : 150
+         },
+         "supported" : [ "headerDecompressor" ],
+         "type" : "EE"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "Socket!0",
+         "name" : "Socket!0",
+         "ports" : [
+            {
+               "id" : 3
+            },
+            {
+               "id" : 5
+            },
+            {
+               "id" : 6
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 0,
+            "delay" : 0.50,
+            "mem" : 0,
+            "storage" : 0
+         },
+         "type" : "SDN-SWITCH"
+      },
+      {
+         "domain" : "INTERNAL",
+         "id" : "NRBUS",
+         "name" : "NRBUS",
+         "ports" : [
+            {
+               "id" : 8
+            },
+            {
+               "id" : 11
+            },
+            {
+               "id" : 14
+            },
+            {
+               "id" : 16
+            }
+         ],
+         "resources" : {
+            "bandwidth" : 1000,
+            "cpu" : 0,
+            "delay" : 0.50,
+            "mem" : 0,
+            "storage" : 0
+         },
+         "type" : "SDN-SWITCH"
+      }
+   ],
+   "node_saps" : [
+      {
+         "id" : "eth0",
+         "name" : "eth0",
+         "ports" : [
+            {
+               "id" : 7
+            }
+         ]
+      },
+      {
+         "id" : "tunl0",
+         "name" : "tunl0",
+         "ports" : [
+            {
+               "id" : 10
+            }
+         ]
+      },
+      {
+         "id" : "wlan0",
+         "name" : "wlan0",
+         "ports" : [
+            {
+               "id" : 13
+            }
+         ]
+      }
+   ],
+   "parameters" : {
+      "id" : "bananapi",
+      "name" : "NFFG-bananapi",
+      "version" : "1.0"
+   }
+}

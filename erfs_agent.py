@@ -8,14 +8,18 @@ from flask import Flask, request
 
 app = Flask(__name__)
 if len(sys.argv) > 1:
-  OFPORT = int(sys.argv[1])
+  VHOST_DIR = str(sys.argv[1])
+else:
+  VHOST_DIR = "/home/cart/Documents/erfs"
+
+if len(sys.argv) > 2:
+  OFPORT = int(sys.argv[2])
 else:
   OFPORT=16633
 
 ADDRESS = "127.0.0.1"
 CPORT = OFPORT-1
 DBR= "tcp:" + ADDRESS + ":" + str(OFPORT)
-VHOST_DIR="/home/cart/Documents/erfs"
 SOCKET=0
 DPID=1
 SUPPORTED_VNFS=["simpleForwarderVHOST", "trafficGeneratorVHOST", "generatorKNI", "forwarderKNI"]
@@ -168,14 +172,16 @@ def api_delflow ():
 @app.route('/delport/<portname>')
 def api_delport (portname):
   ret1=remove_lcore(portname)
-  comm="remove-port " + portmap[portname]["erfs_port"]
+  port=portmap[portname]["erfs_port"]
+  comm="remove-port " + port 
   ret2=send_request(comm)
   if ret2.rstrip() == "OK" and ret1 == True:
+    if port.startswith("VHOST"):
+      subprocess.call(["sudo", "rm" ,"-f", VHOST_DIR + '/' + portname])      
     del portmap[portname]
     return 'OK', 200
   else:
     return error_msg("Error in deleting ports")
-
 
 def send_request(request):
   s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

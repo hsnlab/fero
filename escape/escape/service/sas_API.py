@@ -30,6 +30,7 @@ from escape.util.mapping import PreMapEvent, PostMapEvent
 from escape.util.misc import schedule_delayed_as_coop_task, \
   schedule_as_coop_task, notify_remote_visualizer, VERBOSE
 from pox.lib.revent.revent import Event
+import time
 
 
 class InstantiateNFFGEvent(Event):
@@ -172,6 +173,7 @@ class ServiceRequestHandler(AbstractRequestHandler):
     :return: None
     """
     self.log.debug("Called REST-API function: sg")
+    self.log.info(int(round(time.time() * 1000)))
     # Obtain NFFG from request body
     log.debug("Detected response format: %s" % self.headers.get("Content-Type"))
     body = self._get_body()

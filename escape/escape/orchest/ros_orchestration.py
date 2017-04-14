@@ -21,7 +21,7 @@ from escape.orchest.ros_mapping import ResourceOrchestrationMapper
 from escape.util.mapping import AbstractOrchestrator, ProcessorError
 from escape.util.misc import notify_remote_visualizer, VERBOSE
 from escape.nffg_lib.nffg import *
-
+import time
 
 class ResourceOrchestrator(AbstractOrchestrator):
   """
@@ -73,11 +73,15 @@ class ResourceOrchestrator(AbstractOrchestrator):
         nffg.add_sglink(v[0], v[1], flowclass=v[2], bandwidth=v[3], delay=v[4],
                            id=k[2])
 
+    DPDK_COST=0
+    VHOST_COST=0
+    KNI_COST=0
+
     for sap in nffg.saps:
       if sap.id.startswith("dpdk"):
         dpdk=sap.id.split('-')[0]
         dpdk_nf=nffg.add_nf(id=dpdk)
-        dpdk_nf.resources.cpu=0
+        dpdk_nf.resources.cpu=DPDK_COST
         dpdk_nf.resources.mem=0
         dpdk_nf.resources.storage=0
         dpdk_nf.functional_type=dpdk
@@ -108,20 +112,22 @@ class ResourceOrchestrator(AbstractOrchestrator):
 
       if nf.functional_type.endswith("KNI"):
         NF_TYPE="KNI"
+        PORT_RES=KNI_COST
       elif nf.functional_type.endswith("VHOST"): 
         NF_TYPE="VHOST"
+        PORT_RES=VHOST_COST
 
       if len(nf.ports) > 1:
         in_nf = nf.copy()
         in_nf.ports.clear()
-        in_nf.resources.cpu=0
+        in_nf.resources.cpu=PORT_RES
         in_nf.resources.mem=0
         in_nf.id=nf.id + "-in"
         in_nf.functional_type=NF_TYPE
         nffg.add_nf(nf=in_nf)
         out_nf = nf.copy()
         out_nf.ports.clear()
-        out_nf.resources.cpu=0
+        out_nf.resources.cpu=PORT_RES
         out_nf.resources.mem=0
         out_nf.functional_type=NF_TYPE
         out_nf.id=nf.id + "-out"
@@ -129,7 +135,7 @@ class ResourceOrchestrator(AbstractOrchestrator):
       else:
         in_nf = nf.copy()
         in_nf.ports.clear()
-        in_nf.resources.cpu=0
+        in_nf.resources.cpu=PORT_RES
         in_nf.resources.mem=0
         in_nf.id=nf.id + "-inout"
         in_nf.functional_type=NF_TYPE
@@ -281,10 +287,14 @@ class ResourceOrchestrator(AbstractOrchestrator):
         try:
           # Run Nf-FG mapping orchestration
           log.debug("Starting request preprocession...")
+          log.info(int(round(time.time() * 1000)))
           self.preprocess_nffg(nffg)
+          log.debug("Preprocession ended, start mapping")
+          log.info(int(round(time.time() * 1000)))
           mapped_nffg = self.mapper.orchestrate(nffg, global_view)
           log.debug("NF-FG instantiation is finished by %s" %
                     self.__class__.__name__)
+          log.info(int(round(time.time() * 1000)))
           return mapped_nffg
         except ProcessorError as e:
           log.warning("Mapping pre/post processing was unsuccessful! "

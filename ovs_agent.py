@@ -9,13 +9,13 @@ app = Flask(__name__)
 if len(sys.argv) > 1:
   OVS_DIR = sys.argv[1]
 else:
-  OVS_DIR = "/home/sdn-tmit/src/marci/ovs/utilities/"
-  #OVS_DIR = "/home/cart/Documents/dpdktest/ovs/utilities/"
+  #OVS_DIR = "/home/sdn-tmit/src/marci/ovs/utilities/"
+  OVS_DIR = "/home/cart/Documents/dpdktest/ovs/utilities/"
 DPDK_DIR = "/home/sdn-tmit/src/marci/dpdk-patched"
 DBR = "dpdk_br"
 SERVER = '192.168.56.103'
 
-SUPPORTED_VNFS=["simpleForwarder", "trafficGenerator"]
+SUPPORTED_VNFS=["simpleForwarderVHOST"]
 
 @app.errorhandler(500)
 def error_msg(error=None):
@@ -73,7 +73,7 @@ def api_start ():
     return error_msg("Not implemented NF type")
 
   ports=data['nf_ports']
-
+  nf=data['nf_id'].encode()
   mem=data["mem"]
 
   #Cores
@@ -81,86 +81,39 @@ def api_start ():
   coreids = [int(core.split('#')[1]) for core in cores]
 
   #At least 1 core/port needs to be allocated
-  if len(ports) > len(cores):
+  if len(ports) > len(cores) and nftype.endswith("VHOST"):
     return error_msg("Not enough cores")
 
   #Convert from PU ID to hexa portmask
-  mask=0
-  for core in coreids:
-    mask = mask + pow(2,core)
-  hexcore=hex(mask)
-
-  nf=data['nf_id'].encode()
+  hexcore=get_portmask(coreids)
   
   params=[]
-
-  if nftype == "trafficGenerator":
-    params += ["sudo", "docker", "run", "-it", "-d", "--cap-add", "SYS_ADMIN"]
-  else:
-    params += ["sudo", "docker", "run", "-t", "-d", "--cap-add", "SYS_ADMIN"]
-
   #Dict to store port name and ovs portnum mappings
   ovs_ports=dict()	 
   
-  x=0
   for port in ports:
     ovs_port=port['port_id'].encode()
-    ovs_core=port['core'].encode().split('#')[1]  
+    ovs_core=port['core'].encode().split('#')[1] 
+ 
     #Add port to the OVS bridge.
-    subprocess.call(["sudo", OVS_DIR + "ovs-vsctl", "add-port", DBR,		
-                     ovs_port , "--", "set", "Interface",ovs_port ,
-                     "type=dpdkvhostuser"])
+    if nftype.endswith("VHOST"):
+      subprocess.call(["sudo", OVS_DIR + "ovs-vsctl", "add-port", DBR,		
+                       ovs_port , "--", "set", "Interface",ovs_port ,
+                       "type=dpdkvhostuser"])
 
-    #Set rxq affinity.
-    subprocess.call(["sudo", OVS_DIR + "ovs-vsctl", "set", "Interface",		
-                     ovs_port , "other_config:pmd-rxq-affinity=0:" + ovs_core])
+      #Set rxq affinity.
+      subprocess.call(["sudo", OVS_DIR + "ovs-vsctl", "set", "Interface",		
+                       ovs_port , "other_config:pmd-rxq-affinity=0:" + ovs_core])
 
-    #Get openflow portnum of the newly created port.
-    portnum=subprocess.check_output(["sudo", OVS_DIR + "ovs-vsctl" ,
-                                     "get", "Interface", ovs_port, "ofport"])
+      #Get openflow portnum of the newly created port.
+      portnum=subprocess.check_output(["sudo", OVS_DIR + "ovs-vsctl" ,
+                                       "get", "Interface", ovs_port, "ofport"])
 
-    #Store it.
-    ovs_ports[ovs_port]=portnum.rstrip()					
-    params += ["-v", "/usr/local/var/run/openvswitch/" +
-               ovs_port + ":/var/run/usvhost" + str(x)]
-    x += 1
+      #Store it.
+      ovs_ports[ovs_port]=portnum.rstrip()
 
-  if nftype == "simpleForwarder": 
-    params += ["-v", "/dev/hugepages:/dev/hugepages","dpdk-l2fwd",
-                 "./examples/l2fwd/build/l2fwd", "-c", hexcore ,
-                 "-n", "4", "-m", str(mem) , "--no-pci", "--file-prefix", nf]				 
-    x=0
-    for port in ports:
-      params += ["--vdev=virtio_user" + str(x) + ",path=/var/run/usvhost" + str(x)]
-      x += 1
-
-    # DPDK core mask	  
-    params += ["--", "-p", "0x" + str(pow(2,len(ports))-1)] 
-
-  else:
-    params += ["-v", "/dev/hugepages:/dev/hugepages","dpdk-pktgen",
-                 "./app/app/x86_64-native-linuxapp-gcc/pktgen", "-c", hexcore ,
-                 "-n", "4", "-m", str(mem) , "--no-pci", "--file-prefix", nf]	
-
-    # The lowest port is reserved for display and timers
-    coreids.remove(min(coreids))
-    # PKTGEN port setup: each rx/tx pair handled by 1 different core
-    pktgen_param= None		 
-    x=0
-    for port in ports:
-      params += ["--vdev=virtio_user" + str(x) + ",path=/var/run/usvhost" + str(x)]
-      if pktgen_param is None:
-        pktgen_param = str(coreids[x]) + "." + str(x)
-      else:
-        pktgen_param = pktgen_param + ", " + str(coreids[x]) + "." + str(x) 
-      x += 1
-
-    # DPDK core mask
-    params += ["--", "-P", "-m", pktgen_param] 
-        
-  # Get newly initiated container ID
-  proc=subprocess.Popen(params, stdout=subprocess.PIPE) 	
-  cid=proc.stdout.readline().rstrip()
+  if nftype == "simpleForwarderVHOST":
+    cid=start_simpleForwarder(ports, hexcore, mem, nf) 
 
   ret = {'cid': cid, 		  # ID of the new container
          'ovs_ports': ovs_ports}  # New ports with openflow IDs
@@ -185,6 +138,59 @@ def api_delport (portname):
     return 'OK', 200
   else:
     return error_msg("Error in deleting ports")
+
+def get_portmask(coreids):
+  mask=0
+  for core in coreids:
+    mask = mask + pow(2,core)
+  return hex(mask)
+
+def start_simpleForwarder(nf_ports, hexcore, mem, nf):
+  params=[]
+  params2=[]
+  params += ["sudo", "docker", "run", "-t", "-d", "--cap-add", "SYS_ADMIN"]
+  x=0
+  for port in nf_ports:
+    ovs_port=port['port_id'].encode()
+    params += ["-v", "/usr/local/var/run/openvswitch/" + ovs_port + ":/var/run/usvhost" + str(x)]
+    params2 += ["--vdev=virtio_user" + str(x) + ",path=/var/run/usvhost" + str(x)]
+    x += 1
+  params += ["-v", "/dev/hugepages:/dev/hugepages","dpdk-l2fwd",
+               "./examples/l2fwd/build/l2fwd", "-c", hexcore ,
+               "-n", "4", "-m", str(mem) , "--no-pci", "--file-prefix", nf]
+  params += params2
+  params += ["--", "-p", "0x" + str(pow(2,len(nf_ports))-1)]
+  proc=subprocess.Popen(params, stdout=subprocess.PIPE) 	
+  cid=proc.stdout.readline().rstrip()
+  return cid
+
+def start_trafficGenerator(nf_ports, hexcore, mem, nf, nf_coreids):
+  coreids=list(nf_coreids)
+  params=[]
+  params2=[]
+  params += ["sudo", "docker", "run", "-it", "-d", "--cap-add", "SYS_ADMIN"]
+  # The lowest port is reserved for display and timers
+  coreids.remove(min(coreids))
+  # PKTGEN port setup: each rx/tx pair handled by 1 different core
+  pktgen_param= None
+  x=0
+  for port in nf_ports:
+    ovs_port=port['port_id'].encode()
+    params += ["-v", "/usr/local/var/run/openvswitch/" + ovs_port + ":/var/run/usvhost" + str(x)]
+    params2 += ["--vdev=virtio_user" + str(x) + ",path=/var/run/usvhost" + str(x)]
+    if pktgen_param is None:
+      pktgen_param = str(coreids[x]) + "." + str(x)
+    else:
+      pktgen_param = pktgen_param + ", " + str(coreids[x]) + "." + str(x) 
+    x += 1
+  params += ["-v", "/dev/hugepages:/dev/hugepages","dpdk-pktgen",
+             "./app/app/x86_64-native-linuxapp-gcc/pktgen", "-c", hexcore ,
+             "-n", "4", "-m", str(mem) , "--no-pci", "--file-prefix", nf]
+  params += params2
+  params += ["--", "-P", "-m", pktgen_param]
+  proc=subprocess.Popen(params, stdout=subprocess.PIPE) 	
+  cid=proc.stdout.readline().rstrip()
+  return cid
 
 
 def __flow_processor (raw):

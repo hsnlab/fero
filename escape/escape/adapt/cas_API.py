@@ -23,6 +23,7 @@ from escape.nffg_lib.nffg import NFFG
 from escape.util.api import AbstractAPI
 from escape.util.misc import schedule_as_coop_task
 from pox.lib.revent.revent import Event
+import time
 
 
 class GlobalResInfoEvent(Event):
@@ -150,6 +151,7 @@ class ControllerAdaptationAPI(AbstractAPI):
     """
     log.getChild('API').info("Invoke install_nffg on %s with NF-FG: %s " % (
       self.__class__.__name__, mapped_nffg))
+    log.info(int(round(time.time() * 1000)))
     try:
       install_result = self.controller_adapter.install_nffg(mapped_nffg)
     except Exception as e:
@@ -158,6 +160,7 @@ class ControllerAdaptationAPI(AbstractAPI):
       raise
     log.getChild('API').debug("Invoked install_nffg on %s is finished" %
                               self.__class__.__name__)
+    log.info(int(round(time.time() * 1000)))
     self.raiseEventNoErrors(InstallationFinishedEvent, id=mapped_nffg.id,
                             result=install_result)
 
